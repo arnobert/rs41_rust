@@ -13,17 +13,22 @@ fn main() -> ! {
     let cp = cortex_m::Peripherals::take().unwrap();
 
     let mut rcc = dp.RCC.constrain();
-    let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
-    let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
+    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
+    let mut ledr = gpiob.pb8.into_push_pull_output(&mut gpiob.crh);
+    let mut ledg = gpiob.pb7.into_push_pull_output(&mut gpiob.crl);
 
     let mut flash = dp.FLASH.constrain();
     let clocks = rcc.cfgr.sysclk(8.mhz()).freeze(&mut flash.acr);
     let mut delay = Delay::new(cp.SYST, clocks);
 
     loop {
-        led.set_high().ok();
+        ledr.set_high().ok();
         delay.delay_ms(1_000_u16);
-        led.set_low().ok();
+        ledr.set_low().ok();
         delay.delay_ms(1_000_u16);
+        ledg.set_high().ok();
+        delay.delay_ms(1_000_u16);
+        ledg.set_low().ok();
+       delay.delay_ms(1_000_u16);
     }
 }
