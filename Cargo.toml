@@ -3,16 +3,12 @@ name = "rs41_test"
 version = "0.1.0"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-cortex-m = "^0.6.3"      # Access to the generic ARM peripherals
-cortex-m-rt = "^0.6.12"  # Startup code for the ARM Core
-embedded-hal = "^0.2.4"  # Access to generic embedded functions (`set_high`)
-panic-halt = "^0.2.0"    # Panic handler
+cortex-m = "^0.6.3"      
+cortex-m-rt = "^0.6.12"  
+embedded-hal = "^0.2.4"  
+panic-halt = "^0.2.0"    
 
-# Access to the stm32f103 HAL.
 [dependencies.stm32f1xx-hal]
-# Bluepill contains a 64kB flash variant which is called "medium density"
 features = ["stm32f100", "rt", "medium"]
 version = "^0.6.1"
