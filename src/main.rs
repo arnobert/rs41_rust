@@ -1,34 +1,40 @@
 #![no_std]
 #![no_main]
 
-use cortex_m_rt::entry; // The runtime
-use embedded_hal::digital::v2::OutputPin; // the `set_high/low`function
-use stm32f1xx_hal::{delay::Delay, pac, prelude::*}; // STM32F1 specific functions
+mod rs41_led;
+
+use cortex_m_rt::entry;
+use stm32f1xx_hal::{delay::Delay, pac, prelude::*};
 #[allow(unused_imports)]
-use panic_halt; // When a panic occurs, stop the microcontroller
+use panic_halt;
+
+use crate::rs41_led::RS41_Led;
 
 #[entry]
 fn main() -> ! {
     let dp = pac::Peripherals::take().unwrap();
     let cp = cortex_m::Peripherals::take().unwrap();
-
     let mut rcc = dp.RCC.constrain();
     let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
-    let mut ledr = gpiob.pb8.into_push_pull_output(&mut gpiob.crh);
-    let mut ledg = gpiob.pb7.into_push_pull_output(&mut gpiob.crl);
 
     let mut flash = dp.FLASH.constrain();
     let clocks = rcc.cfgr.sysclk(8.mhz()).freeze(&mut flash.acr);
     let mut delay = Delay::new(cp.SYST, clocks);
 
+
+
+
+    let mut leds : RS41_Led;
+    leds = RS41_Led::init(gpiob);
     loop {
-        ledr.set_high().ok();
+        leds.led_r_on();
         delay.delay_ms(1_000_u16);
-        ledr.set_low().ok();
+        leds.led_r_off();
         delay.delay_ms(1_000_u16);
-        ledg.set_high().ok();
+        leds.led_g_on();
         delay.delay_ms(1_000_u16);
-        ledg.set_low().ok();
-       delay.delay_ms(1_000_u16);
+        leds.led_g_off();
+        delay.delay_ms(1_000_u16);
+
     }
 }
