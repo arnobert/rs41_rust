@@ -1,40 +1,63 @@
 #![no_std]
 #![no_main]
 
-mod rs41_led;
-
-use cortex_m_rt::entry;
-use stm32f1xx_hal::{delay::Delay, pac, prelude::*};
+use cortex_m_rt::entry; // The runtime
+use embedded_hal::digital::v2::OutputPin; // the `set_high/low`function
+use stm32f1xx_hal::{pac, prelude::*}; // STM32F1 specific functions
 #[allow(unused_imports)]
-use panic_halt;
+use panic_halt; // When a panic occurs, stop the microcontroller
 
-use crate::rs41_led::RS41_Led;
+#[rtic::app(device = stm32f1xx_hal::pac)]
+mod app {
+    use stm32f1xx_hal::{
+        gpio::{gpiob::PB8, Output, PinState, PushPull},
+        pac,
+        prelude::*,
+        timer::{CounterMs, Event},
+    };
 
-#[entry]
-fn main() -> ! {
-    let dp = pac::Peripherals::take().unwrap();
-    let cp = cortex_m::Peripherals::take().unwrap();
-    let mut rcc = dp.RCC.constrain();
-    let mut gpiob = dp.GPIOB.split(&mut rcc.apb2);
+    #[shared]
+    struct Shared {}
 
-    let mut flash = dp.FLASH.constrain();
-    let clocks = rcc.cfgr.sysclk(8.mhz()).freeze(&mut flash.acr);
-    let mut delay = Delay::new(cp.SYST, clocks);
-
-
-
-
-    let mut leds : RS41_Led;
-    leds = RS41_Led::init(gpiob);
-    loop {
-        leds.led_r_on();
-        delay.delay_ms(1_000_u16);
-        leds.led_r_off();
-        delay.delay_ms(1_000_u16);
-        leds.led_g_on();
-        delay.delay_ms(1_000_u16);
-        leds.led_g_off();
-        delay.delay_ms(1_000_u16);
-
+    #[local]
+    struct Local {
+        led: PB8<Output<PushPull>>,
+        timer_handler: CounterMs<pac::TIM1>,
     }
+
+    #[init]
+    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        let mut flash = cx.device.FLASH.constrain();
+        let rcc = cx.device.RCC.constrain();
+
+        let clocks = rcc.cfgr.freeze(&mut flash.acr);
+
+        let mut gpiob = cx.device.GPIOB.split();
+
+        let led = gpiob
+            .pb8
+            .into_push_pull_output_with_state(&mut gpiob.crh, PinState::High);
+
+
+        let mut timer = cx.device.TIM1.counter_ms(&clocks);
+        timer.start(1.secs()).unwrap();
+        timer.listen(Event::Update);
+
+        (
+            Shared {},
+            Local {
+                led,
+                timer_handler: timer,
+            },
+            init::Monotonics(),
+        )
+    }
+
+    #[idle]
+    fn idle(_cx: idle::Context) -> ! {
+        loop {
+            cortex_m::asm::wfi();
+        }
+    }
+
 }
