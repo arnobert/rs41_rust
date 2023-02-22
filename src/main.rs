@@ -10,7 +10,7 @@ use panic_halt; // When a panic occurs, stop the microcontroller
 #[rtic::app(device = stm32f1xx_hal::pac)]
 mod app {
     use stm32f1xx_hal::{
-        gpio::{gpiob::PB8, Output, PinState, PushPull},
+        gpio::{gpioa::*, gpiob::*, gpioc::*, Output, PinState, PushPull},
         pac,
         prelude::*,
         timer::{CounterMs, Event},
@@ -21,7 +21,8 @@ mod app {
 
     #[local]
     struct Local {
-        led: PB8<Output<PushPull>>,
+        led_r: PB8<Output<PushPull>>,
+        led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
     }
 
@@ -34,9 +35,14 @@ mod app {
 
         let mut gpiob = cx.device.GPIOB.split();
 
-        let led = gpiob
+        let ledr = gpiob
             .pb8
-            .into_push_pull_output_with_state(&mut gpiob.crh, PinState::High);
+            .into_push_pull_output_with_state(&mut gpiob.crh, PinState::Low);
+
+        let ledg = gpiob
+            .pb7
+            .into_push_pull_output_with_state(&mut gpiob.crl, PinState::High);
+
 
 
         let mut timer = cx.device.TIM1.counter_ms(&clocks);
@@ -46,7 +52,8 @@ mod app {
         (
             Shared {},
             Local {
-                led,
+                led_r: ledr,
+                led_g: ledg,
                 timer_handler: timer,
             },
             init::Monotonics(),
