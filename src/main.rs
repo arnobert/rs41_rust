@@ -37,11 +37,11 @@ mod app {
 
         let ledr = gpiob
             .pb8
-            .into_push_pull_output_with_state(&mut gpiob.crh, PinState::Low);
+            .into_push_pull_output_with_state(&mut gpiob.crh, PinState::High);
 
         let ledg = gpiob
             .pb7
-            .into_push_pull_output_with_state(&mut gpiob.crl, PinState::High);
+            .into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low);
 
 
 
@@ -63,7 +63,8 @@ mod app {
     #[idle]
     fn idle(_cx: idle::Context) -> ! {
         loop {
-            cortex_m::asm::wfi();
+            // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
+            //cortex_m::asm::wfi();
         }
     }
 
