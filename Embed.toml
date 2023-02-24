@@ -29,6 +29,10 @@ chip_descriptions = []
 #   "OFF", "ERROR", "WARN", "INFO", "DEBUG", "TRACE" 
 log_level = "WARN"
 
+[rescue.general]
+# Use this flag to assert the nreset & ntrst pins during attaching the probe to the chip.
+connect_under_reset = true
+
 [with_rtt.rtt]
 # Whether or not an RTTUI should be opened after flashing.
 # This is exclusive and cannot be used with GDB at the moment.
