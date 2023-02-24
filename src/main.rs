@@ -9,6 +9,9 @@ use panic_halt; // When a panic occurs, stop the microcontroller
 
 #[rtic::app(device = stm32f1xx_hal::pac)]
 mod app {
+    //use microbit as _;
+    use rtt_target::{rprintln, rtt_init_print};
+
     use stm32f1xx_hal::{
         gpio::{gpioa::*, gpiob::*, gpioc::*, Output, PinState, PushPull},
         pac,
@@ -43,7 +46,7 @@ mod app {
             .pb7
             .into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low);
 
-
+        rtt_init_print!();
 
         let mut timer = cx.device.TIM1.counter_ms(&clocks);
         timer.start(1.secs()).unwrap();
@@ -63,6 +66,7 @@ mod app {
     #[idle]
     fn idle(_cx: idle::Context) -> ! {
         loop {
+            rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
         }
