@@ -1,6 +1,53 @@
 #![no_std]
 #![no_main]
 
+/*   RS-41 pin description:
+PA:
+00 : NFC IN
+01 : MEAS OUT
+02 : PULLUP HYG
+03 : SPST2
+04 : FRONTEND ??
+05 : VBAT MON
+06 : SW
+07 : HEAT HUM 1
+08 : RPM CLK
+09 : GPS RX
+10 : GPS TX
+11 : NFC IN
+12 : SHUTDOWN
+13 : XDATA SWDIO
+14 : XDATA SWCLK
+15 : GPS RESETn
+
+PB:
+00 : NFC OUT
+01 : REF R THERM
+02 : SPI CS
+03 : SPDT 1 - SENSOR MUX
+04 : SPDT 2
+05 : SPDT 3
+06 : SPST 1
+07 : LED GN
+08 : LED RD
+09 : HEAT HUM 2
+10 : XDATA TX
+11 : XDATA RX
+12 : PULLUP TMP
+13 : SPISCK
+14 : SPI SDI
+15 : SPI SDO
+
+PC:
+13 : CS RADIO
+14 : SPST 3
+15 : SPST 4
+
+ */
+
+
+
+
 use cortex_m_rt::entry; // The runtime
 use embedded_hal::digital::v2::OutputPin; // the `set_high/low`function
 use stm32f1xx_hal::{pac, prelude::*}; // STM32F1 specific functions
@@ -47,8 +94,11 @@ mod app {
 
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
 
+        let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
+        let mut gpioc = cx.device.GPIOC.split();
 
+        // LEDs
         let ledr = gpiob
             .pb8
             .into_push_pull_output_with_state(&mut gpiob.crh, PinState::High);
@@ -56,6 +106,8 @@ mod app {
         let ledg = gpiob
             .pb7
             .into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low);
+
+
 
         rtt_init_print!();
 
