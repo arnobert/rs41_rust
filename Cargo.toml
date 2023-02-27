@@ -10,6 +10,7 @@ cortex-m-rtic = { version = "1.1.3", default-features = false }
 embedded-hal = "^0.2.4"  
 panic-halt = "^0.2.0"
 rtt-target = { version = "0.3.1", features = ["cortex-m"] }
+ublox = { version = "0.4.2", default-features = false }
 
 [dependencies.stm32f1xx-hal]
 features = ["stm32f100", "rt", "medium"]

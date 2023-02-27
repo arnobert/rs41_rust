@@ -18,6 +18,7 @@ mod app {
         prelude::*,
         timer::{CounterMs, Event},
     };
+    use stm32f1xx_hal::serial::{Config, Serial};
 
     #[shared]
     struct Shared {}
@@ -27,10 +28,20 @@ mod app {
         led_r: PB8<Output<PushPull>>,
         led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
+        //serial: Serial<pac::USART1, pac::USART1>
     }
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        fn init_profile(device: &pac::Peripherals) {
+            // On development, keep the DBG module powered on during wfi()
+            device.DBGMCU.cr.modify(|_, w| w.dbg_standby().set_bit());
+            device.DBGMCU.cr.modify(|_, w| w.dbg_sleep().set_bit());
+            device.DBGMCU.cr.modify(|_, w| w.dbg_stop().set_bit());
+        }
+
+        //init_profile(&cx.device);
+
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
 
@@ -52,12 +63,28 @@ mod app {
         timer.start(1.secs()).unwrap();
         timer.listen(Event::Update);
 
+        // USART1
+        //let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
+        //let rx = gpioa.pa10;
+
+        // Set up the usart device. Taks ownership over the USART register and tx/rx pins. The rest of
+        // the registers are used to enable and configure the device.
+/*        let mut serial = Serial::usart1(
+            cx.device.USART1,
+            (tx, rx),
+            &mut afio.mapr,
+            Config::default().baudrate(9600.bps()),
+            clocks,
+            &mut rcc.apb1,
+        );*/
+
         (
             Shared {},
             Local {
                 led_r: ledr,
                 led_g: ledg,
                 timer_handler: timer,
+                //serial
             },
             init::Monotonics(),
         )
@@ -66,7 +93,7 @@ mod app {
     #[idle]
     fn idle(_cx: idle::Context) -> ! {
         loop {
-            rprintln!("kadse");
+            //rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
         }
