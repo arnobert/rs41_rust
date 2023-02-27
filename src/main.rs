@@ -89,10 +89,14 @@ mod app {
 
         //init_profile(&cx.device);
 
+
+        let p = pac::Peripherals::take().unwrap();
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
 
         let clocks = rcc.cfgr.freeze(&mut flash.acr);
+
+        let mut afio = cx.device.AFIO.constrain();
 
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
@@ -116,19 +120,16 @@ mod app {
         timer.listen(Event::Update);
 
         // USART1
-        //let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
-        //let rx = gpioa.pa10;
+        let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
+        let rx = gpioa.pa10;
 
-        // Set up the usart device. Taks ownership over the USART register and tx/rx pins. The rest of
-        // the registers are used to enable and configure the device.
-/*        let mut serial = Serial::usart1(
+        let mut gps_serial = Serial::new(
             cx.device.USART1,
             (tx, rx),
             &mut afio.mapr,
             Config::default().baudrate(9600.bps()),
-            clocks,
-            &mut rcc.apb1,
-        );*/
+            &clocks,
+        );
 
         (
             Shared {},
