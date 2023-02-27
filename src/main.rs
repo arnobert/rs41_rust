@@ -44,14 +44,15 @@ PC:
 15 : SPST 4
 
  */
-
-
+use embedded_hal::spi::{Mode, Phase, Polarity};
+pub const SPIMODE: Mode = Mode {
+    phase: Phase::CaptureOnSecondTransition,
+    polarity: Polarity::IdleHigh,
+};
 
 #[allow(unused_imports)]
 
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
-use stm32f1xx_hal::{pac, prelude::*};
 use panic_halt;
 
 #[rtic::app(device = stm32f1xx_hal::pac)]
@@ -64,8 +65,10 @@ mod app {
         prelude::*,
         timer::{CounterMs, Event},
         serial::{Config, Serial},
+        spi::{Pins, Spi, Spi1NoRemap},
     };
     use stm32f1xx_hal::gpio::{Alternate, Floating, Input};
+    use crate::SPIMODE;
 
     #[shared]
     struct Shared {}
@@ -111,6 +114,19 @@ mod app {
             .pb7
             .into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low);
 
+        // SPI
+        let spi_clk = gpiob.pb13.into_alternate_push_pull(&mut gpiob.crh);
+        let spi_sdo = gpiob.pb15.into_alternate_push_pull(&mut gpiob.crh);
+        let spi_sdi = gpiob.pb14;
+
+
+        let mut rs_spi = Spi::spi2(
+            cx.device.SPI2,
+            (spi_clk, spi_sdi, spi_sdo),
+            SPIMODE,
+            1.MHz(),
+            clocks,
+        );
 
 
         rtt_init_print!();
