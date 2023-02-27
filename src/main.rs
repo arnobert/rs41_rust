@@ -47,16 +47,15 @@ PC:
 
 
 
-
-use cortex_m_rt::entry; // The runtime
-use embedded_hal::digital::v2::OutputPin; // the `set_high/low`function
-use stm32f1xx_hal::{pac, prelude::*}; // STM32F1 specific functions
 #[allow(unused_imports)]
-use panic_halt; // When a panic occurs, stop the microcontroller
+
+use cortex_m_rt::entry;
+use embedded_hal::digital::v2::OutputPin;
+use stm32f1xx_hal::{pac, prelude::*};
+use panic_halt;
 
 #[rtic::app(device = stm32f1xx_hal::pac)]
 mod app {
-    //use microbit as _;
     use rtt_target::{rprintln, rtt_init_print};
 
     use stm32f1xx_hal::{
@@ -64,8 +63,9 @@ mod app {
         pac,
         prelude::*,
         timer::{CounterMs, Event},
+        serial::{Config, Serial},
     };
-    use stm32f1xx_hal::serial::{Config, Serial};
+    use stm32f1xx_hal::gpio::{Alternate, Floating, Input};
 
     #[shared]
     struct Shared {}
@@ -75,7 +75,7 @@ mod app {
         led_r: PB8<Output<PushPull>>,
         led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
-        //serial: Serial<pac::USART1, pac::USART1>
+        gps_serial: Serial<stm32f1xx_hal::pac::USART1, (PA9<Alternate<PushPull>>, PA10<Input<Floating>>)>,
     }
 
     #[init]
@@ -120,8 +120,8 @@ mod app {
         timer.listen(Event::Update);
 
         // USART1
-        let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
-        let rx = gpioa.pa10;
+        let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh); //RX
+        let rx = gpioa.pa10;                                         //TX
 
         let mut gps_serial = Serial::new(
             cx.device.USART1,
@@ -137,7 +137,7 @@ mod app {
                 led_r: ledr,
                 led_g: ledg,
                 timer_handler: timer,
-                //serial
+                gps_serial,
             },
             init::Monotonics(),
         )
