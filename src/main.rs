@@ -79,7 +79,7 @@ mod app {
         led_r: PB8<Output<PushPull>>,
         led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
-        //gps_serial: Serial<stm32f1xx_hal::pac::USART1, (PA9<Alternate<PushPull>>, PA10<Input<Floating>>)>,
+        gps_serial: Serial<stm32f1xx_hal::pac::USART1, (PA9<Alternate<PushPull>>, PA10<Input<Floating>>)>,
         spi: Spi<stm32f1xx_hal::pac::SPI2,
                 stm32f1xx_hal::spi::Spi2NoRemap,
                 (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
@@ -140,16 +140,16 @@ mod app {
         timer.listen(Event::Update);
 
         // USART1
-        //let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh); //RX
-        //let rx = gpioa.pa10;                                         //TX
+        let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh); //RX
+        let rx = gpioa.pa10;                                         //TX
 
-        //let mut gps_serial = Serial::new(
-        //    cx.device.USART1,
-        //    (tx, rx),
-        //    &mut afio.mapr,
-        //    Config::default().baudrate(9600.bps()),
-        //    &clocks,
-        //);
+        let mut gps_serial = Serial::new(
+            cx.device.USART1,
+            (tx, rx),
+            &mut afio.mapr,
+            Config::default().baudrate(9600.bps()),
+            &clocks,
+        );
 
         (
             Shared {},
@@ -157,7 +157,7 @@ mod app {
                 led_r: ledr,
                 led_g: ledg,
                 timer_handler: timer,
-                //gps_serial,
+                gps_serial,
                 spi: rs_spi,
             },
             init::Monotonics(),
@@ -168,7 +168,7 @@ mod app {
     fn idle(cx: idle::Context) -> ! {
         loop {
             let write_data  = [0x42];
-            //cx.local.spi.write(&write_data);
+            cx.local.spi.write(&write_data);
             //rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
