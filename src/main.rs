@@ -98,7 +98,6 @@ mod app {
         //init_profile(&cx.device);
 
 
-        let p = pac::Peripherals::take().unwrap();
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
 
