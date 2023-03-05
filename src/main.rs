@@ -53,11 +53,10 @@ pub const SPIMODE: Mode = Mode {
 #[allow(unused_imports)]
 
 use cortex_m_rt::entry;
-use panic_halt;
+use panic_halt as _;
 
 #[rtic::app(device = stm32f1xx_hal::pac)]
 mod app {
-    use core::marker::PhantomData;
     use rtt_target::{rprintln, rtt_init_print};
 
     use stm32f1xx_hal::{
@@ -66,7 +65,7 @@ mod app {
         prelude::*,
         timer::{CounterMs, Event},
         serial::{Config, Serial},
-        spi::{Pins, Spi, Spi1NoRemap},
+        spi::{Spi},
     };
     use stm32f1xx_hal::gpio::{Alternate, Floating, Input};
     use crate::SPIMODE;
@@ -80,6 +79,7 @@ mod app {
         led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
         gps_serial: Serial<stm32f1xx_hal::pac::USART1, (PA9<Alternate<PushPull>>, PA10<Input<Floating>>)>,
+        cs_radio: PC13<Output<PushPull>>,
         spi: Spi<stm32f1xx_hal::pac::SPI2,
                 stm32f1xx_hal::spi::Spi2NoRemap,
                 (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
@@ -94,10 +94,9 @@ mod app {
             device.DBGMCU.cr.modify(|_, w| w.dbg_sleep().set_bit());
             device.DBGMCU.cr.modify(|_, w| w.dbg_stop().set_bit());
         }
-
         //init_profile(&cx.device);
 
-
+        // Peripherals -----------------------------------------------------------------------------
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
 
@@ -109,7 +108,7 @@ mod app {
         let mut gpiob = cx.device.GPIOB.split();
         let mut gpioc = cx.device.GPIOC.split();
 
-        // LEDs
+        // LEDs ------------------------------------------------------------------------------------
         let ledr = gpiob
             .pb8
             .into_push_pull_output_with_state(&mut gpiob.crh, PinState::High);
@@ -118,11 +117,12 @@ mod app {
             .pb7
             .into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low);
 
-        // SPI
+        // SPI -------------------------------------------------------------------------------------
+        let spi_cs_radio = gpioc.pc13.into_push_pull_output_with_state(&mut gpioc.crh, PinState::Low);
+
         let spi_clk = gpiob.pb13.into_alternate_push_pull(&mut gpiob.crh);
         let spi_sdo = gpiob.pb15.into_alternate_push_pull(&mut gpiob.crh);
         let spi_sdi = gpiob.pb14;
-
 
         let mut rs_spi = Spi::spi2(
             cx.device.SPI2,
@@ -133,13 +133,15 @@ mod app {
         );
 
 
+        // RTT -------------------------------------------------------------------------------------
         rtt_init_print!();
 
+        // Timer -----------------------------------------------------------------------------------
         let mut timer = cx.device.TIM1.counter_ms(&clocks);
         timer.start(1.secs()).unwrap();
         timer.listen(Event::Update);
 
-        // USART1
+        // USART1 ----------------------------------------------------------------------------------
         let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh); //RX
         let rx = gpioa.pa10;                                         //TX
 
@@ -151,6 +153,7 @@ mod app {
             &clocks,
         );
 
+        // End init --------------------------------------------------------------------------------
         (
             Shared {},
             Local {
@@ -158,6 +161,7 @@ mod app {
                 led_g: ledg,
                 timer_handler: timer,
                 gps_serial,
+                cs_radio: spi_cs_radio,
                 spi: rs_spi,
             },
             init::Monotonics(),
@@ -168,12 +172,10 @@ mod app {
     fn idle(cx: idle::Context) -> ! {
         loop {
             let write_data  = [0x42];
-            cx.local.spi.write(&write_data);
-            //rprintln!("kadse");
+            _ = cx.local.spi.write(&write_data);
+            rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
         }
     }
-
-
 }
