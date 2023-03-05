@@ -50,6 +50,10 @@ pub const SPIMODE: Mode = Mode {
     polarity: Polarity::IdleHigh,
 };
 
+
+
+
+
 #[allow(unused_imports)]
 
 use cortex_m_rt::entry;
@@ -69,6 +73,8 @@ mod app {
     };
     use stm32f1xx_hal::gpio::{Alternate, Floating, Input};
     use crate::SPIMODE;
+    use ublox::*;
+    use heapless::Vec;
 
     #[shared]
     struct Shared {}
@@ -152,6 +158,13 @@ mod app {
             Config::default().baudrate(9600.bps()),
             &clocks,
         );
+
+
+        // UBLOX -----------------------------------------------------------------------------------
+        // Parser:
+        let mut buf: Vec<u8, 8> = Vec::new();
+        let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
+        let mut parser = ublox::Parser::new(buf);
 
         // End init --------------------------------------------------------------------------------
         (
