@@ -166,6 +166,9 @@ mod app {
         let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
         let mut parser = ublox::Parser::new(buf);
 
+        //Gen:
+        let ubxcfg = ublox::CfgMsgAllPortsBuilder{msg_class: 1, msg_id: 1, rates: [0,0,0,0,0,0]};
+
         // End init --------------------------------------------------------------------------------
         (
             Shared {},
