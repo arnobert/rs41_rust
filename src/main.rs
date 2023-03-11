@@ -85,7 +85,6 @@ mod app {
         led_r: PB8<Output<PushPull>>,
         led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
-        //gps_serial: Serial<stm32f1xx_hal::pac::USART1, (PA9<Alternate<PushPull>>, PA10<Input<Floating>>)>,
 
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
@@ -160,7 +159,7 @@ mod app {
             cx.device.USART1,
             (tx, rx),
             &mut afio.mapr,
-            Config::default().baudrate(9600.bps()),
+            Config::default().baudrate(57600.bps()),
             &clocks,
         );
         let (mut gps_tx, mut gps_rx) = gps_serial.split();
@@ -177,7 +176,7 @@ mod app {
 
         rprintln!("42");
 
-        //tx.write(&ublox_cfg);
+
         // End init --------------------------------------------------------------------------------
         (
             Shared {},
@@ -196,11 +195,14 @@ mod app {
 
 
 
-    #[idle(local=[spi])]
+    #[idle(local=[spi, gps_tx])]
     fn idle(cx: idle::Context) -> ! {
+        let dummycfg: u8 = 42;
+
         loop {
             let write_data  = [0x42];
             _ = cx.local.spi.write(&write_data);
+            cx.local.gps_tx.write(dummycfg);
             //rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
