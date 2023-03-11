@@ -167,7 +167,8 @@ mod app {
         let mut parser = ublox::Parser::new(buf);
 
         //Gen:
-        let ubxcfg = ublox::CfgMsgAllPortsBuilder{msg_class: 1, msg_id: 1, rates: [0,0,0,0,0,0]};
+        let ubxcfg = ublox::CfgMsgAllPortsBuilder{msg_class: 1, msg_id: 1, rates: [0,0,0,0,0,0]}
+            .into_packet_bytes();
 
         // End init --------------------------------------------------------------------------------
         (
