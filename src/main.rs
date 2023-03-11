@@ -174,7 +174,10 @@ mod app {
         let ubxcfg = CfgMsgAllPortsBuilder{msg_class: 1, msg_id: 1, rates: [0,0,0,0,0,0]}
             .into_packet_bytes();
 
-        rprintln!("42");
+        for c in ubxcfg {
+            rprintln!("{}", c);
+        }
+
 
 
         // End init --------------------------------------------------------------------------------
