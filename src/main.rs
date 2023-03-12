@@ -59,10 +59,10 @@ pub const SPIMODE: Mode = Mode {
 use cortex_m_rt::entry;
 use panic_halt as _;
 
-#[rtic::app(device = stm32f1xx_hal::pac)]
+#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true)]
 mod app {
     use rtt_target::{rprintln, rtt_init_print};
-
+    use systick_monotonic::{fugit::Duration, Systick};
     use stm32f1xx_hal::{
         gpio::{gpioa::*, gpiob::*, gpioc::*, Output, PinState, PushPull},
         pac,
@@ -96,6 +96,9 @@ mod app {
                 u8 >,
     }
 
+    #[monotonic(binds = SysTick, default = true)]
+    type MonoTimer = Systick<1000>;
+
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
         fn init_profile(device: &pac::Peripherals) {
@@ -110,9 +113,17 @@ mod app {
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
 
-        let clocks = rcc.cfgr.freeze(&mut flash.acr);
+        let mono = Systick::new(cx.core.SYST, 24_000_000);
+        let clocks = rcc
+            .cfgr
+            .use_hse(24.MHz())
+            .sysclk(24.MHz())
+            .pclk1(24.MHz())
+            .freeze(&mut flash.acr);
 
         let mut afio = cx.device.AFIO.constrain();
+
+
 
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
@@ -192,7 +203,7 @@ mod app {
                 cs_radio: spi_cs_radio,
                 spi: rs_spi,
             },
-            init::Monotonics(),
+            init::Monotonics(mono),
         )
     }
 
