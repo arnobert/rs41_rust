@@ -59,7 +59,7 @@ pub const SPIMODE: Mode = Mode {
 use cortex_m_rt::entry;
 use panic_halt as _;
 
-#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true)]
+#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2])]
 mod app {
     use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
@@ -130,13 +130,15 @@ mod app {
         let mut gpioc = cx.device.GPIOC.split();
 
         // LEDs ------------------------------------------------------------------------------------
-        let ledr = gpiob
+        let mut ledr = gpiob
             .pb8
             .into_push_pull_output_with_state(&mut gpiob.crh, PinState::High);
 
-        let ledg = gpiob
+        let mut ledg = gpiob
             .pb7
             .into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low);
+
+        ledr.toggle();
 
         // SPI -------------------------------------------------------------------------------------
         let spi_cs_radio = gpioc.pc13.into_push_pull_output_with_state(&mut gpioc.crh, PinState::Low);
@@ -213,6 +215,8 @@ mod app {
     fn idle(cx: idle::Context) -> ! {
         let dummycfg: u8 = 42;
 
+        //blink_led::spawn_after(Duration::<u64, 1, 1>::from_ticks(10)).unwrap();
+
         loop {
             let write_data  = [0x42];
             _ = cx.local.spi.write(&write_data);
@@ -223,4 +227,10 @@ mod app {
         }
     }
 
+/*    #[task(local=[led_r])]
+    fn blink_led(cx: blink_led::Context) {
+        cortex_m::asm::nop();
+        //cx.local.led_r.toggle();
+    }
+*/
 }
