@@ -121,6 +121,7 @@ mod app {
             .pclk1(24.MHz())
             .freeze(&mut flash.acr);
 
+
         let mut afio = cx.device.AFIO.constrain();
 
 
@@ -215,7 +216,7 @@ mod app {
     fn idle(cx: idle::Context) -> ! {
         let dummycfg: u8 = 42;
 
-        //blink_led::spawn_after(Duration::<u64, 1, 1>::from_ticks(10)).unwrap();
+        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
 
         loop {
             let write_data  = [0x42];
@@ -227,10 +228,9 @@ mod app {
         }
     }
 
-/*    #[task(local=[led_r])]
+    #[task(local=[led_r])]
     fn blink_led(cx: blink_led::Context) {
-        cortex_m::asm::nop();
-        //cx.local.led_r.toggle();
+        cx.local.led_r.toggle();
     }
-*/
+
 }
