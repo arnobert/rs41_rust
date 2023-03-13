@@ -216,7 +216,7 @@ mod app {
     fn idle(cx: idle::Context) -> ! {
         let dummycfg: u8 = 42;
 
-        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
 
         loop {
             let write_data  = [0x42];
@@ -231,6 +231,7 @@ mod app {
     #[task(local=[led_r])]
     fn blink_led(cx: blink_led::Context) {
         cx.local.led_r.toggle();
+        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
 }
