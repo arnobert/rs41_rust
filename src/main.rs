@@ -44,6 +44,7 @@ PC:
 15 : SPST 4
 
  */
+mod hell;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 pub const SPIMODE: Mode = Mode {
     phase: Phase::CaptureOnSecondTransition,
