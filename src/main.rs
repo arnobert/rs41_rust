@@ -78,7 +78,13 @@ mod app {
     use si4032_driver as radio;
     //----------------------------------------------------------------------------------------------
     #[shared]
-    struct Shared {}
+    struct Shared {
+        cs_radio: PC13<Output<PushPull>>,
+        spi: Spi<stm32f1xx_hal::pac::SPI2,
+            stm32f1xx_hal::spi::Spi2NoRemap,
+            (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
+            u8 >,
+    }
 
     #[local]
     struct Local {
@@ -88,12 +94,6 @@ mod app {
 
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
-
-        cs_radio: PC13<Output<PushPull>>,
-        spi: Spi<stm32f1xx_hal::pac::SPI2,
-                stm32f1xx_hal::spi::Spi2NoRemap,
-                (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
-                u8 >,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -197,15 +197,16 @@ mod app {
 
         // End init --------------------------------------------------------------------------------
         (
-            Shared {},
+            Shared {
+                cs_radio: spi_cs_radio,
+                spi: rs_spi,
+            },
             Local {
                 led_r: ledr,
                 led_g: ledg,
                 timer_handler: timer,
                 gps_tx,
                 gps_rx,
-                cs_radio: spi_cs_radio,
-                spi: rs_spi,
             },
             init::Monotonics(mono),
         )
@@ -213,15 +214,15 @@ mod app {
 
 
 
-    #[idle(local=[spi, gps_tx])]
+    #[idle(local=[gps_tx])]
     fn idle(cx: idle::Context) -> ! {
         let dummycfg: u8 = 42;
 
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
 
         loop {
-            let write_data  = [0x42];
-            _ = cx.local.spi.write(&write_data);
+            //let write_data  = [0x42];
+            //_ = cx.local.spi.write(&write_data);
             cx.local.gps_tx.write(dummycfg);
             //rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
@@ -233,6 +234,15 @@ mod app {
     fn blink_led(cx: blink_led::Context) {
         cx.local.led_r.toggle();
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+    }
+
+    #[task(shared=[&spi])]
+    fn write_2_spi(cx: write_2_spi::Context, reg: u8, dat: u8) {
+        //cx.shared.spi.lock(|spi|  cx.shared.spi.write(&dat));
+        //cx.shared.spi.write(&dat);
+        let mut write_data  = [0x42];
+        let mut xspi = cx.shared.spi;
+        //xspi.write(&write_data);
     }
 
 }
