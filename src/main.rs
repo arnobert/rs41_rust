@@ -51,10 +51,6 @@ pub const SPIMODE: Mode = Mode {
     polarity: Polarity::IdleHigh,
 };
 
-
-
-
-
 #[allow(unused_imports)]
 
 use cortex_m_rt::entry;
@@ -65,19 +61,22 @@ mod app {
     use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
     use stm32f1xx_hal::{
-        gpio::{gpioa::*, gpiob::*, gpioc::*, Output, PinState, PushPull},
+        gpio::{gpioa::*, gpiob::*, gpioc::*,
+               Input, Alternate, Floating,
+               Output, PinState, PushPull},
         pac,
         prelude::*,
         timer::{CounterMs, Event},
         serial::{Config, Serial},
         spi::{Spi},
     };
-    use stm32f1xx_hal::gpio::{Alternate, Floating, Input};
     use crate::SPIMODE;
     use ublox::*;
     use heapless::Vec;
     use stm32f1xx_hal::pac::USART1;
 
+    use si4032_driver as radio;
+    //----------------------------------------------------------------------------------------------
     #[shared]
     struct Shared {}
 
@@ -193,6 +192,7 @@ mod app {
             rprintln!("{}", c);
         }
 
+        radio::init();
 
 
         // End init --------------------------------------------------------------------------------
