@@ -68,7 +68,7 @@ mod app {
         prelude::*,
         timer::{CounterMs, Event},
         serial::{Config, Serial},
-        spi::{Spi},
+        spi::*,
     };
     use crate::SPIMODE;
     use ublox::*;
@@ -78,13 +78,7 @@ mod app {
     use si4032_driver as radio;
     //----------------------------------------------------------------------------------------------
     #[shared]
-    struct Shared {
-        cs_radio: PC13<Output<PushPull>>,
-        spi: Spi<stm32f1xx_hal::pac::SPI2,
-            stm32f1xx_hal::spi::Spi2NoRemap,
-            (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
-            u8 >,
-    }
+    struct Shared {}
 
     #[local]
     struct Local {
@@ -94,6 +88,12 @@ mod app {
 
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
+
+        cs_radio: PC13<Output<PushPull>>,
+        spi: Spi<stm32f1xx_hal::pac::SPI2,
+            stm32f1xx_hal::spi::Spi2NoRemap,
+            (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
+            u8 >,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -197,16 +197,15 @@ mod app {
 
         // End init --------------------------------------------------------------------------------
         (
-            Shared {
-                cs_radio: spi_cs_radio,
-                spi: rs_spi,
-            },
+            Shared {},
             Local {
                 led_r: ledr,
                 led_g: ledg,
                 timer_handler: timer,
                 gps_tx,
                 gps_rx,
+                cs_radio: spi_cs_radio,
+                spi: rs_spi,
             },
             init::Monotonics(mono),
         )
@@ -236,13 +235,17 @@ mod app {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
-    #[task(shared=[&spi])]
-    fn write_2_spi(cx: write_2_spi::Context, reg: u8, dat: u8) {
-        //cx.shared.spi.lock(|spi|  cx.shared.spi.write(&dat));
-        //cx.shared.spi.write(&dat);
+    #[task(local=[spi])]
+    fn write_2_spi(mut cx: write_2_spi::Context, reg: u8, dat: u8) {
+
         let mut write_data  = [0x42];
-        let mut xspi = cx.shared.spi;
-        //xspi.write(&write_data);
+        cx.local.spi.write(&write_data);
+
+    }
+
+
+    fn call_spi() {
+        write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
     }
 
 }
