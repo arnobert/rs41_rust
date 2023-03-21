@@ -89,11 +89,11 @@ mod app {
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
 
-        cs_radio: PC13<Output<PushPull>>,
-        spi: Spi<stm32f1xx_hal::pac::SPI2,
-            stm32f1xx_hal::spi::Spi2NoRemap,
-            (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
-            u8 >,
+        radioSPI:   si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
+                    stm32f1xx_hal::spi::Spi2NoRemap,
+                    (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
+                    u8 >,
+                    PC13<Output<PushPull>>>,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -156,6 +156,8 @@ mod app {
             clocks,
         );
 
+        let radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
+
         // RTT -------------------------------------------------------------------------------------
         rtt_init_print!();
 
@@ -200,8 +202,7 @@ mod app {
                 timer_handler: timer,
                 gps_tx,
                 gps_rx,
-                cs_radio: spi_cs_radio,
-                spi: rs_spi,
+                radioSPI,
             },
             init::Monotonics(mono),
         )
@@ -231,6 +232,7 @@ mod app {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
+    /*
     #[task(local=[spi])]
     fn write_2_spi(mut cx: write_2_spi::Context, reg: u8, dat: u8) {
 
@@ -243,5 +245,5 @@ mod app {
     fn call_spi() {
         write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
     }
-
+*/
 }
