@@ -237,6 +237,7 @@ mod app {
     #[task(local=[radioSPI])]
     fn write_2_spi(cx: write_2_spi::Context, reg: u8, dat: u8) {
         cx.local.radioSPI.write_register(0, 0);
+        write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
 
     }
 }
