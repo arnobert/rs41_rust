@@ -215,6 +215,7 @@ mod app {
         let dummycfg: u8 = 42;
 
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
 
         loop {
             //let write_data  = [0x42];
