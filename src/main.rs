@@ -232,18 +232,10 @@ mod app {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
-    /*
-    #[task(local=[spi])]
-    fn write_2_spi(mut cx: write_2_spi::Context, reg: u8, dat: u8) {
 
-        let mut write_data  = [0x42];
-        cx.local.spi.write(&write_data);
+    #[task(local=[radioSPI])]
+    fn write_2_spi(cx: write_2_spi::Context, reg: u8, dat: u8) {
+        cx.local.radioSPI.write_register(0, 0);
 
     }
-
-
-    fn call_spi() {
-        write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
-    }
-*/
 }
