@@ -11,8 +11,20 @@ const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 // TX PERIOD [s]
 const tx_period: u8 = 30;
 
-// TX POWER [dBm]
-const tx_power: u8 = 0;
+// TX POWER:
+#[repr(u8)]
+enum tx_power {
+   p_1dBm = 0x0,
+   p_2dBm = 0x1,
+   p_5dBm = 0x2,
+   p_8dBm = 0x3,
+   p_11dBm = 0x4,
+   p_14dBm = 0x5,
+   p_17dBm = 0x6,
+   p_20dBm = 0x7
+}
+
+const tx_power: u8 = tx_power::p_1dBm as u8;
 // -------------------------------------------------------------------------------------------------
 
 // hbsel (Si432) -> 70cm ham band (430..439.99 MHz)
@@ -267,7 +279,7 @@ mod app {
 
     #[task(local=[radioSPI])]
     fn write_2_spi(cx: write_2_spi::Context, reg: u8, dat: u8) {
-        cx.local.radioSPI.write_register(0, 0);
+        //cx.local.radioSPI.write_register(0, 0);
         write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
 
     }
