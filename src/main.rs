@@ -13,7 +13,7 @@ const tx_period: u8 = 30;
 
 // TX POWER:
 #[repr(u8)]
-enum tx_power {
+enum e_tx_power {
    p_1dBm = 0x0,
    p_2dBm = 0x1,
    p_5dBm = 0x2,
@@ -24,7 +24,7 @@ enum tx_power {
    p_20dBm = 0x7
 }
 
-const tx_power: u8 = tx_power::p_1dBm as u8;
+const tx_power: u8 = e_tx_power::p_1dBm as u8;
 // -------------------------------------------------------------------------------------------------
 
 // hbsel (Si432) -> 70cm ham band (430..439.99 MHz)
@@ -108,7 +108,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::SPIMODE;
+    use crate::{f_c_upper, SPIMODE, tx_power};
     use ublox::*;
     use heapless::Vec;
     use stm32f1xx_hal::pac::USART1;
@@ -194,7 +194,7 @@ mod app {
             clocks,
         );
 
-        let radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
+        let mut radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
 
         // RTT -------------------------------------------------------------------------------------
         rtt_init_print!();
@@ -232,9 +232,8 @@ mod app {
         }
 
         // Init Radio ------------------------------------------------------------------------------
-
-        // TODO: set params
-
+            radioSPI.set_freq(f_c_upper, f_c_upper);
+            radioSPI.set_tx_pwr(tx_power);
 
         // End init --------------------------------------------------------------------------------
         (
