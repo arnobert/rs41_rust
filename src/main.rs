@@ -71,7 +71,6 @@ PC:
  */
 mod hell;
 
-use core::ffi::c_float;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 pub const SPIMODE: Mode = Mode {
     phase: Phase::CaptureOnSecondTransition,
