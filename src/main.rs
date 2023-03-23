@@ -108,7 +108,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{f_c_upper, SPIMODE, tx_power};
+    use crate::{f_c_upper, f_c_lower, SPIMODE, tx_power};
     use ublox::*;
     use heapless::Vec;
     use stm32f1xx_hal::pac::USART1;
@@ -180,7 +180,7 @@ mod app {
         ledr.toggle();
 
         // SPI -------------------------------------------------------------------------------------
-        let spi_cs_radio = gpioc.pc13.into_push_pull_output_with_state(&mut gpioc.crh, PinState::Low);
+        let spi_cs_radio = gpioc.pc13.into_push_pull_output_with_state(&mut gpioc.crh, PinState::High);
 
         let spi_clk = gpiob.pb13.into_alternate_push_pull(&mut gpiob.crh);
         let spi_sdo = gpiob.pb15.into_alternate_push_pull(&mut gpiob.crh);
@@ -232,8 +232,18 @@ mod app {
         }
 
         // Init Radio ------------------------------------------------------------------------------
-            radioSPI.set_freq(f_c_upper, f_c_upper);
-            radioSPI.set_tx_pwr(tx_power);
+
+        radioSPI.enter_standby();
+        radioSPI.set_freq(f_c_upper,  f_c_lower);
+        radioSPI.set_tx_pwr(tx_power);
+
+        rprintln!("SET UPPER: {}", f_c_upper);
+        rprintln!("SET LOWER: {}", f_c_lower);
+
+        let f = radioSPI.get_freq();
+
+        rprintln!("UPPER: {}", f[1]);
+        rprintln!("LOWER: {}", f[0]);
 
         // End init --------------------------------------------------------------------------------
         (
@@ -278,7 +288,10 @@ mod app {
 
     #[task(local=[radioSPI])]
     fn write_2_spi(cx: write_2_spi::Context, reg: u8, dat: u8) {
-        //cx.local.radioSPI.write_register(0, 0);
+        let f = cx.local.radioSPI.get_freq();
+
+        rprintln!("UPPER: {}", f[1]);
+        rprintln!("LOWER: {}", f[0]);
         write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
 
     }
