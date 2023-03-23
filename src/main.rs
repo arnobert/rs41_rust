@@ -1,6 +1,31 @@
 #![no_std]
 #![no_main]
 
+// USER CONFIG -------------------------------------------------------------------------------------
+// TX frequency [kHz * 10 ]
+const f_tx: u32 = 43220;
+
+// CALLSIGN
+const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
+
+// TX PERIOD [s]
+const tx_period: u8 = 30;
+
+// TX POWER [dBm]
+const tx_power: u8 = 0;
+// -------------------------------------------------------------------------------------------------
+
+// hbsel (Si432) -> 70cm ham band (430..439.99 MHz)
+// DO NOT CHANGE!
+const f_range: u8 = 19;
+
+// Calculate frequency registers
+const f_c: u32 = f_tx * 64 - 2752000;
+const f_c_upper: u8 = ((f_c & 0xFF00) >> 8) as u8;
+const f_c_lower: u8 = (f_c & 0xFF) as u8;
+
+// -------------------------------------------------------------------------------------------------
+
 /*   RS-41 pin description:
 PA:
 00 : NFC IN
@@ -45,6 +70,8 @@ PC:
 
  */
 mod hell;
+
+use core::ffi::c_float;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 pub const SPIMODE: Mode = Mode {
     phase: Phase::CaptureOnSecondTransition,
@@ -192,6 +219,11 @@ mod app {
         for c in ubxcfg {
             rprintln!("{}", c);
         }
+
+        // Init Radio ------------------------------------------------------------------------------
+
+        // TODO: set params
+
 
         // End init --------------------------------------------------------------------------------
         (
