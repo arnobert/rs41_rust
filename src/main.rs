@@ -84,6 +84,7 @@ mod app {
     use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
     use stm32f1xx_hal::{
+        adc::*,
         gpio::{gpioa::*, gpiob::*, gpioc::*,
                Input, Alternate, Floating,
                Output, PinState, PushPull},
@@ -217,6 +218,16 @@ mod app {
         // USART3 (Expansion header)----------------------------------------------------------------
         let exp_tx = gpiob.pb11.into_alternate_push_pull(&mut gpiob.crh);
         let exp_rx = gpiob.pb10;
+
+
+        // ADC -------------------------------------------------------------------------------------
+        let mut adc_ch0 = gpioa.pa5.into_analog(&mut gpioa.crl); // Battery voltage
+        let mut adc_ch1 = gpioa.pa6.into_analog(&mut gpioa.crl); // Switch
+
+        let mut adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
+
+        let vbat: u16 = adc1.read(&mut adc_ch0).unwrap();
+        let pbut: u16 = adc1.read(&mut adc_ch1).unwrap();
 
         // Init Radio ------------------------------------------------------------------------------
 
