@@ -81,7 +81,7 @@ use panic_halt as _;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2])]
 mod app {
-    use rtt_target::{rprintln, rtt_init_print};
+    //use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
     use stm32f1xx_hal::{
         adc::*,
@@ -185,7 +185,7 @@ mod app {
         let mut radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
 
         // RTT -------------------------------------------------------------------------------------
-        rtt_init_print!();
+        //rtt_init_print!();
 
         // Timer -----------------------------------------------------------------------------------
         let mut timer = cx.device.TIM1.counter_ms(&clocks);
@@ -215,9 +215,9 @@ mod app {
         let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 1, msg_id: 1, rates: [0, 0, 0, 0, 0, 0] }
             .into_packet_bytes();
 
-        for c in ubxcfg {
-            rprintln!("{}", c);
-        }
+        //for c in ubxcfg {
+        //    rprintln!("{}", c);
+        //}
 
         // USART3 (Expansion header)----------------------------------------------------------------
         let exp_tx = gpiob.pb11.into_alternate_push_pull(&mut gpiob.crh);
@@ -230,8 +230,7 @@ mod app {
 
         let mut adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
 
-        let vbat: u16 = adc1.read(&mut adc_ch0).unwrap();
-        let pbut: u16 = adc1.read(&mut adc_ch1).unwrap();
+
 
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let mut shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
@@ -242,13 +241,13 @@ mod app {
         radioSPI.set_freq(f_c_upper, f_c_lower);
         radioSPI.set_tx_pwr(tx_power);
 
-        rprintln!("SET UPPER: {}", f_c_upper);
-        rprintln!("SET LOWER: {}", f_c_lower);
+        //rprintln!("SET UPPER: {}", f_c_upper);
+        //rprintln!("SET LOWER: {}", f_c_lower);
 
         let f = radioSPI.get_freq();
 
-        rprintln!("UPPER: {}", f[1]);
-        rprintln!("LOWER: {}", f[0]);
+        //rprintln!("UPPER: {}", f[1]);
+        //rprintln!("LOWER: {}", f[0]);
 
         // End init --------------------------------------------------------------------------------
         (
@@ -277,7 +276,7 @@ mod app {
         //cx.local.gps_tx.write(dummycfg);
 
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-
+        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         loop {
             //let write_data  = [0x42];
             //_ = cx.local.spi.write(&write_data);
@@ -310,5 +309,17 @@ mod app {
         });
     }
 
-    //#[task()]
+    // ADC measurements ----------------------------------------------------------------------------
+    #[task(local = [adc_ch_0, adc_ch_1, adc_1])]
+    fn read_adc(mut cx: read_adc::Context) {
+
+        let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
+        let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
+
+        //rprintln!("BATTERY VOLTAGE: {}", vbat);
+        //rprintln!("BUTTON VOLTAGE: {}", pbut);
+
+        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
+
+    }
 }

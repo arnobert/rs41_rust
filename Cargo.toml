@@ -9,7 +9,7 @@ cortex-m-rt = "0.7.3"
 cortex-m-rtic = { version = "1.1.3", default-features = false }
 embedded-hal = "0.2.7"
 panic-halt = "^0.2.0"
-rtt-target = { version = "0.3.1", features = ["cortex-m"]}
+#rtt-target = { version = "0.3.1", features = ["cortex-m"]}
 ublox = { version = "0.4.2", default-features = false }
 heapless = "0.7.16"
 systick-monotonic = "1.0.1"
