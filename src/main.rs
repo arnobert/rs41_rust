@@ -11,20 +11,8 @@ const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 // TX PERIOD [s]
 const tx_period: u8 = 30;
 
-// TX POWER:
-#[repr(u8)]
-enum e_tx_power {
-   p_1dBm = 0x0,
-   p_2dBm = 0x1,
-   p_5dBm = 0x2,
-   p_8dBm = 0x3,
-   p_11dBm = 0x4,
-   p_14dBm = 0x5,
-   p_17dBm = 0x6,
-   p_20dBm = 0x7
-}
 
-const tx_power: u8 = e_tx_power::p_1dBm as u8;
+const tx_power: u8 = si4032_driver::e_tx_power::p_1dBm as u8;
 // -------------------------------------------------------------------------------------------------
 
 // hbsel (Si432) -> 70cm ham band (430..439.99 MHz)
@@ -84,13 +72,13 @@ PC:
 mod hell;
 
 use embedded_hal::spi::{Mode, Phase, Polarity};
+
 pub const SPIMODE: Mode = Mode {
     phase: Phase::CaptureOnSecondTransition,
     polarity: Polarity::IdleHigh,
 };
 
 #[allow(unused_imports)]
-
 use cortex_m_rt::entry;
 use panic_halt as _;
 
@@ -111,9 +99,9 @@ mod app {
     use crate::{f_c_upper, f_c_lower, SPIMODE, tx_power};
     use ublox::*;
     use heapless::Vec;
-    use stm32f1xx_hal::pac::USART1;
+    use stm32f1xx_hal::pac::{USART1, USART3};
 
-    use si4032_driver as radio;
+    //use si4032_driver as radio;
     //----------------------------------------------------------------------------------------------
     #[shared]
     struct Shared {}
@@ -127,11 +115,11 @@ mod app {
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
 
-        radioSPI:   si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
-                    stm32f1xx_hal::spi::Spi2NoRemap,
-                    (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
-                    u8 >,
-                    PC13<Output<PushPull>>>,
+        radioSPI: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
+            stm32f1xx_hal::spi::Spi2NoRemap,
+            (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
+            u8>,
+            PC13<Output<PushPull>>>,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -161,9 +149,6 @@ mod app {
 
 
         let mut afio = cx.device.AFIO.constrain();
-
-
-
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
         let mut gpioc = cx.device.GPIOC.split();
@@ -205,8 +190,8 @@ mod app {
         timer.listen(Event::Update);
 
         // USART1 ----------------------------------------------------------------------------------
-        let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh); //RX
-        let rx = gpioa.pa10;                                         //TX
+        let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
+        let rx = gpioa.pa10;
 
         let mut gps_serial = Serial::new(
             cx.device.USART1,
@@ -224,17 +209,22 @@ mod app {
         let mut parser = ublox::Parser::new(buf);
 
         //Gen:
-        let ubxcfg = CfgMsgAllPortsBuilder{msg_class: 1, msg_id: 1, rates: [0,0,0,0,0,0]}
+        let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 1, msg_id: 1, rates: [0, 0, 0, 0, 0, 0] }
             .into_packet_bytes();
 
         for c in ubxcfg {
             rprintln!("{}", c);
         }
 
+        // USART3 (Expansion header)----------------------------------------------------------------
+        let exp_tx = gpiob.pb11.into_alternate_push_pull(&mut gpiob.crh);
+        let exp_rx = gpiob.pb10;
+
+
         // Init Radio ------------------------------------------------------------------------------
 
         radioSPI.enter_standby();
-        radioSPI.set_freq(f_c_upper,  f_c_lower);
+        radioSPI.set_freq(f_c_upper, f_c_lower);
         radioSPI.set_tx_pwr(tx_power);
 
         rprintln!("SET UPPER: {}", f_c_upper);
@@ -261,38 +251,25 @@ mod app {
     }
 
 
-
-    #[idle(local=[gps_tx])]
+    #[idle(local = [gps_tx])]
     fn idle(cx: idle::Context) -> ! {
         let dummycfg: u8 = 42;
+        cx.local.gps_tx.write(dummycfg);
 
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-        write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
 
         loop {
             //let write_data  = [0x42];
             //_ = cx.local.spi.write(&write_data);
-            cx.local.gps_tx.write(dummycfg);
             //rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
         }
     }
 
-    #[task(local=[led_r])]
+    #[task(local = [led_r])]
     fn blink_led(cx: blink_led::Context) {
         cx.local.led_r.toggle();
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-    }
-
-
-    #[task(local=[radioSPI])]
-    fn write_2_spi(cx: write_2_spi::Context, reg: u8, dat: u8) {
-        let f = cx.local.radioSPI.get_freq();
-
-        rprintln!("UPPER: {}", f[1]);
-        rprintln!("LOWER: {}", f[0]);
-        write_2_spi::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000), 0x23, 0x42).unwrap();
-
     }
 }
