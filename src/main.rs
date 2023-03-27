@@ -12,7 +12,7 @@ const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 const tx_period: u8 = 30;
 
 
-const tx_power: u8 = si4032_driver::e_tx_power::p_1dBm as u8;
+const tx_power: si4032_driver::e_tx_power = si4032_driver::e_tx_power::p_1dBm;
 // -------------------------------------------------------------------------------------------------
 
 // hbsel (Si432) -> 70cm ham band (430..439.99 MHz)
@@ -101,7 +101,6 @@ mod app {
     use heapless::Vec;
     use stm32f1xx_hal::pac::{USART1, USART3};
 
-    //use si4032_driver as radio;
     //----------------------------------------------------------------------------------------------
     #[shared]
     struct Shared {}
