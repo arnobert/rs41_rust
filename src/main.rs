@@ -97,7 +97,8 @@ mod app {
     use crate::{f_c_upper, f_c_lower, SPIMODE, tx_power};
     use ublox::*;
     use heapless::Vec;
-    use stm32f1xx_hal::pac::{USART1, USART3};
+    use stm32f1xx_hal::gpio::Analog;
+    use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
 
     //----------------------------------------------------------------------------------------------
     #[shared]
@@ -119,6 +120,9 @@ mod app {
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
             u8>,
             PC13<Output<PushPull>>>,
+        adc_ch_0: PA5<Analog>,
+        adc_ch_1: PA6<Analog>,
+        adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -258,6 +262,9 @@ mod app {
                 gps_tx,
                 gps_rx,
                 radioSPI,
+                adc_ch_0: adc_ch0,
+                adc_ch_1: adc_ch1,
+                adc_1: adc1,
             },
             init::Monotonics(mono),
         )
@@ -302,4 +309,6 @@ mod app {
             *position = [23, 42, 100];
         });
     }
+
+    //#[task()]
 }
