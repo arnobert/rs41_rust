@@ -123,6 +123,8 @@ mod app {
         adc_ch_0: PA5<Analog>,
         adc_ch_1: PA6<Analog>,
         adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
+        shutdown: PA12<Output<PushPull>>,
+        shutdown_next_cycle: bool,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -264,6 +266,8 @@ mod app {
                 adc_ch_0: adc_ch0,
                 adc_ch_1: adc_ch1,
                 adc_1: adc1,
+                shutdown: shtdwn,
+                shutdown_next_cycle: false,
             },
             init::Monotonics(mono),
         )
@@ -310,16 +314,20 @@ mod app {
     }
 
     // ADC measurements ----------------------------------------------------------------------------
-    #[task(local = [adc_ch_0, adc_ch_1, adc_1])]
+    #[task(local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
     fn read_adc(mut cx: read_adc::Context) {
 
         let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
         let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
 
-        //rprintln!("BATTERY VOLTAGE: {}", vbat);
-        //rprintln!("BUTTON VOLTAGE: {}", pbut);
+        if *cx.local.shutdown_next_cycle {
+            cx.local.shutdown.set_high();
+        }
+
+        if pbut > 2000 {
+            *cx.local.shutdown_next_cycle = true;
+        }
 
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
-
     }
 }
