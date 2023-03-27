@@ -103,7 +103,9 @@ mod app {
 
     //----------------------------------------------------------------------------------------------
     #[shared]
-    struct Shared {}
+    struct Shared {
+        position: [u32; 3],
+    }
 
     #[local]
     struct Local {
@@ -219,7 +221,6 @@ mod app {
         let exp_tx = gpiob.pb11.into_alternate_push_pull(&mut gpiob.crh);
         let exp_rx = gpiob.pb10;
 
-
         // Init Radio ------------------------------------------------------------------------------
 
         radioSPI.enter_standby();
@@ -236,7 +237,9 @@ mod app {
 
         // End init --------------------------------------------------------------------------------
         (
-            Shared {},
+            Shared {
+                position: [0, 0, 0],
+            },
             Local {
                 led_r: ledr,
                 led_g: ledg,
@@ -250,10 +253,10 @@ mod app {
     }
 
 
-    #[idle(local = [gps_tx])]
+    #[idle()]
     fn idle(cx: idle::Context) -> ! {
-        let dummycfg: u8 = 42;
-        cx.local.gps_tx.write(dummycfg);
+        //let dummycfg: u8 = 42;
+        //cx.local.gps_tx.write(dummycfg);
 
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
 
@@ -271,4 +274,16 @@ mod app {
         cx.local.led_r.toggle();
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // This is the main task. We receive our GPS location, calculate coordinates,
+    // concat the characters and write to radio FIFO.
+    // ---------------------------------------------------------------------------------------------
+    #[task(local = [radioSPI], shared = [position])]
+    fn tx(cx: tx::Context) {}
+
+
+    // Receiving data from ublox. ------------------------------------------------------------------
+    #[task(binds = USART1, shared = [position])]
+    fn receive_coordinates(cx: receive_coordinates::Context) {}
 }
