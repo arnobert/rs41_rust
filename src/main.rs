@@ -285,5 +285,10 @@ mod app {
 
     // Receiving data from ublox. ------------------------------------------------------------------
     #[task(binds = USART1, shared = [position])]
-    fn receive_coordinates(cx: receive_coordinates::Context) {}
+    fn receive_coordinates(mut cx: receive_coordinates::Context) {
+        cx.shared.position.lock(|position| {
+            /* DO FOO HERE */
+            *position = [23, 42, 100];
+        });
+    }
 }
