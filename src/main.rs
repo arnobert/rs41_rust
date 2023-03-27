@@ -229,6 +229,9 @@ mod app {
         let vbat: u16 = adc1.read(&mut adc_ch0).unwrap();
         let pbut: u16 = adc1.read(&mut adc_ch1).unwrap();
 
+        // SHUTDOWN pin ----------------------------------------------------------------------------
+        let mut shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
+
         // Init Radio ------------------------------------------------------------------------------
 
         radioSPI.enter_standby();
