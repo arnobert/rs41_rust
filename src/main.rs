@@ -19,7 +19,7 @@ const hbsel: bool = true;
 const f_c: u16 = 0xE9A7;
 
 
-const f_c_upper: u8 = ((f_c & 0xFF00)>>8) as u8;
+const f_c_upper: u8 = ((f_c & 0xFF00) >> 8) as u8;
 const f_c_lower: u8 = (f_c & 0x00FF) as u8;
 // -------------------------------------------------------------------------------------------------
 
@@ -233,7 +233,6 @@ mod app {
         let mut adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
 
 
-
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let mut shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
@@ -314,9 +313,8 @@ mod app {
     }
 
     // ADC measurements ----------------------------------------------------------------------------
-    #[task(local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
+    #[task(local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle, led_g])]
     fn read_adc(mut cx: read_adc::Context) {
-
         let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
         let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
 
@@ -326,6 +324,7 @@ mod app {
 
         if pbut > 2000 {
             *cx.local.shutdown_next_cycle = true;
+            cx.local.led_g.set_high();
         }
 
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
