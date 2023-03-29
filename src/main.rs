@@ -319,7 +319,7 @@ mod app {
             cx.local.shutdown.set_high();
         }
 
-        if pbut > 2000 {
+        if (vbat-pbut) < 100 {
             *cx.local.shutdown_next_cycle = true;
             cx.local.led_g.set_high();
         }
