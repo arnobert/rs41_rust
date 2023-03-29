@@ -242,8 +242,6 @@ mod app {
 
         // Init Radio ------------------------------------------------------------------------------
         radioSPI.swreset();
-        radioSPI.enter_ready();
-        radioSPI.enter_tune();
 
         // Set frequencies
         radioSPI.set_hb_sel(true);
