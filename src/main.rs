@@ -140,6 +140,10 @@ mod app {
         }
         //init_profile(&cx.device);
 
+        // Pend interrupts during init -------------------------------------------------------------
+        rtic::pend(stm32f1xx_hal::pac::interrupt::TIM2);
+        rtic::pend(stm32f1xx_hal::pac::interrupt::USART1);
+
         // Peripherals -----------------------------------------------------------------------------
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
@@ -267,16 +271,12 @@ mod app {
 
     #[idle()]
     fn idle(cx: idle::Context) -> ! {
-        //let dummycfg: u8 = 42;
-        //cx.local.gps_tx.write(dummycfg);
-
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         loop {
-
-            //rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
+            cortex_m::asm::delay(100);
         }
     }
 
