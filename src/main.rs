@@ -10,7 +10,7 @@ const _CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 const TX_PERIOD: u8 = 30;
 
 
-const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P1dBm;
+const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
 // -------------------------------------------------------------------------------------------------
 
 
@@ -241,7 +241,9 @@ mod app {
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
         // Init Radio ------------------------------------------------------------------------------
-        radioSPI.enter_standby();
+        radioSPI.swreset();
+        radioSPI.enter_ready();
+        radioSPI.enter_tune();
 
         // Set frequencies
         radioSPI.set_hb_sel(true);
@@ -277,6 +279,7 @@ mod app {
     fn idle(cx: idle::Context) -> ! {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -297,9 +300,11 @@ mod app {
     #[task(local = [radio_spi], shared = [position])]
     fn tx(cx: tx::Context) {
         let write_data  = [0x42];
-        _ = cx.local.radio_spi.enter_standby();
+        _ = cx.local.radio_spi.set_cw();
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
+
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
     }
 
 
