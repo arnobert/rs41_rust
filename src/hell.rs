@@ -3,8 +3,8 @@ Hellschreiber implementation for RS41.
 We use Feld Hell with 7x14 pixels.
  */
 
-pub const n_columns: u8 = 7;
-pub const n_pixel: u8 = 14;
+pub const N_COLUMNS: u8 = 7;
+pub const N_PIXEL: u8 = 14;
 pub fn get_char(x : char) -> u128 {
     match x {
         'A' => 0b00000000000000001111111110000000011001110000000110001100000001100111000011111111100000000000000000,

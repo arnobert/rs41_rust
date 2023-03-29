@@ -4,23 +4,23 @@
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
+const _CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 
 // TX PERIOD [s]
-const tx_period: u8 = 30;
+const TX_PERIOD: u8 = 30;
 
 
-const tx_power: si4032_driver::e_tx_power = si4032_driver::e_tx_power::p_1dBm;
+const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P1dBm;
 // -------------------------------------------------------------------------------------------------
 
 
 // Frequency, as calculated by Python script
-const hbsel: bool = true;
-const f_c: u16 = 0xE9A7;
+const HBSEL: bool = true;
+const CAR_FREQ: u16 = 0xE9A7;
 
 
-const f_c_upper: u8 = ((f_c & 0xFF00) >> 8) as u8;
-const f_c_lower: u8 = (f_c & 0x00FF) as u8;
+const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
+const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 // -------------------------------------------------------------------------------------------------
 
 /*   RS-41 pin description:
@@ -94,7 +94,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{f_c_upper, f_c_lower, SPIMODE, tx_power};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER};
     use ublox::*;
     use heapless::Vec;
     use stm32f1xx_hal::gpio::Analog;
@@ -115,7 +115,7 @@ mod app {
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
 
-        radioSPI: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
+        radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
             u8>,
@@ -227,28 +227,20 @@ mod app {
 
 
         // ADC -------------------------------------------------------------------------------------
-        let mut adc_ch0 = gpioa.pa5.into_analog(&mut gpioa.crl); // Battery voltage
-        let mut adc_ch1 = gpioa.pa6.into_analog(&mut gpioa.crl); // Switch
+        let adc_ch0 = gpioa.pa5.into_analog(&mut gpioa.crl); // Battery voltage
+        let adc_ch1 = gpioa.pa6.into_analog(&mut gpioa.crl); // Switch
 
-        let mut adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
+        let adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
 
 
         // SHUTDOWN pin ----------------------------------------------------------------------------
-        let mut shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
+        let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
         // Init Radio ------------------------------------------------------------------------------
 
         radioSPI.enter_standby();
-        radioSPI.set_freq(f_c_upper, f_c_lower);
-        radioSPI.set_tx_pwr(tx_power);
-
-        //rprintln!("SET UPPER: {}", f_c_upper);
-        //rprintln!("SET LOWER: {}", f_c_lower);
-
-        let f = radioSPI.get_freq();
-
-        //rprintln!("UPPER: {}", f[1]);
-        //rprintln!("LOWER: {}", f[0]);
+        radioSPI.set_freq(F_C_UPPER, F_C_LOWER);
+        radioSPI.set_tx_pwr(TX_POWER);
 
         // End init --------------------------------------------------------------------------------
         (
@@ -261,7 +253,7 @@ mod app {
                 timer_handler: timer,
                 gps_tx,
                 gps_rx,
-                radioSPI,
+                radio_spi: radioSPI,
                 adc_ch_0: adc_ch0,
                 adc_ch_1: adc_ch1,
                 adc_1: adc1,
@@ -281,8 +273,7 @@ mod app {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         loop {
-            //let write_data  = [0x42];
-            //_ = cx.local.spi.write(&write_data);
+
             //rprintln!("kadse");
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -299,9 +290,10 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(local = [radioSPI], shared = [position])]
+    #[task(local = [radio_spi], shared = [position])]
     fn tx(cx: tx::Context) {
-
+        let write_data  = [0x42];
+        _ = cx.local.radio_spi.enter_standby();
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
     }
@@ -319,7 +311,7 @@ mod app {
 
     // ADC measurements ----------------------------------------------------------------------------
     #[task(local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle, led_g])]
-    fn read_adc(mut cx: read_adc::Context) {
+    fn read_adc(cx: read_adc::Context) {
         let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
         let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
 
