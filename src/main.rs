@@ -300,7 +300,12 @@ mod app {
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
     #[task(local = [radioSPI], shared = [position])]
-    fn tx(cx: tx::Context) {}
+    fn tx(cx: tx::Context) {
+
+        // TEXT TO BE SENT:
+        // $CALL$ POS:00.00000N, 00.00000E, 13370M
+    }
+
 
 
     // Receiving data from ublox. ------------------------------------------------------------------
