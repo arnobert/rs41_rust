@@ -241,10 +241,14 @@ mod app {
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
         // Init Radio ------------------------------------------------------------------------------
-
         radioSPI.enter_standby();
+
+        // Set frequencies
+        radioSPI.set_hb_sel(true);
         radioSPI.set_freq(F_C_UPPER, F_C_LOWER);
         radioSPI.set_tx_pwr(TX_POWER);
+
+        radioSPI.set_cw();
 
         // End init --------------------------------------------------------------------------------
         (
