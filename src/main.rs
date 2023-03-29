@@ -97,6 +97,7 @@ mod app {
     use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER};
     use ublox::*;
     use heapless::Vec;
+    use si4032_driver::ETxPower;
     use stm32f1xx_hal::gpio::Analog;
     use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
 
@@ -120,6 +121,10 @@ mod app {
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
             u8>,
             PC13<Output<PushPull>>>,
+        radio_init: bool,
+        freq_upper: u8,
+        freq_lower: u8,
+        txpwr: ETxPower,
         adc_ch_0: PA5<Analog>,
         adc_ch_1: PA6<Analog>,
         adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
@@ -190,9 +195,6 @@ mod app {
 
         let mut radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
 
-        // RTT -------------------------------------------------------------------------------------
-        //rtt_init_print!();
-
         // Timer -----------------------------------------------------------------------------------
         let mut timer = cx.device.TIM1.counter_ms(&clocks);
         timer.start(1.secs()).unwrap();
@@ -221,10 +223,6 @@ mod app {
         let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 1, msg_id: 1, rates: [0, 0, 0, 0, 0, 0] }
             .into_packet_bytes();
 
-        //for c in ubxcfg {
-        //    rprintln!("{}", c);
-        //}
-
         // USART3 (Expansion header)----------------------------------------------------------------
         let exp_tx = gpiob.pb11.into_alternate_push_pull(&mut gpiob.crh);
         let exp_rx = gpiob.pb10;
@@ -240,15 +238,6 @@ mod app {
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
-        // Init Radio ------------------------------------------------------------------------------
-        radioSPI.swreset();
-
-        // Set frequencies
-        radioSPI.set_hb_sel(true);
-        radioSPI.set_freq(F_C_UPPER, F_C_LOWER);
-        radioSPI.set_tx_pwr(TX_POWER);
-
-        radioSPI.set_cw();
 
         // End init --------------------------------------------------------------------------------
         (
@@ -262,6 +251,10 @@ mod app {
                 gps_tx,
                 gps_rx,
                 radio_spi: radioSPI,
+                radio_init: false,
+                freq_upper: F_C_UPPER,
+                freq_lower: F_C_LOWER,
+                txpwr: TX_POWER,
                 adc_ch_0: adc_ch0,
                 adc_ch_1: adc_ch1,
                 adc_1: adc1,
@@ -275,7 +268,7 @@ mod app {
 
     #[idle()]
     fn idle(cx: idle::Context) -> ! {
-        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
         loop {
@@ -295,10 +288,23 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(local = [radio_spi], shared = [position])]
+    #[task(local = [radio_spi, radio_init, freq_upper, freq_lower, txpwr], shared = [position])]
     fn tx(cx: tx::Context) {
-        let write_data  = [0x42];
-        _ = cx.local.radio_spi.set_cw();
+        let radio = cx.local.radio_spi;
+        //if *cx.local.radio_init == false {
+
+            // Init Radio --------------------------------------------------------------------------
+            radio.swreset();
+
+            // Set frequencies
+            radio.set_hb_sel(true);
+            radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
+            radio.set_tx_pwr(si4032_driver::ETxPower::P5dBm);
+
+            radio.set_cw();
+
+            *cx.local.radio_init = true;
+        //}
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
