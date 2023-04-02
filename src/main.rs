@@ -311,7 +311,7 @@ mod app {
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
 
