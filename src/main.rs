@@ -16,7 +16,9 @@ const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
 
 // Frequency, as calculated by Python script
 const HBSEL: bool = true;
+const FREQBAND: u8 = 0;
 const CAR_FREQ: u16 = 0xE9A7;
+
 
 
 const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
@@ -94,7 +96,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND};
     use ublox::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
@@ -268,7 +270,7 @@ mod app {
 
     #[idle()]
     fn idle(cx: idle::Context) -> ! {
-        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
         loop {
@@ -297,6 +299,7 @@ mod app {
             radio.swreset();
 
             // Set frequencies
+            radio.set_freq_band(FREQBAND);
             radio.set_hb_sel(true);
             radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
             radio.set_tx_pwr(si4032_driver::ETxPower::P5dBm);
