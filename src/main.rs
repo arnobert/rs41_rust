@@ -293,7 +293,7 @@ mod app {
     #[task(priority = 3, local = [radio_spi, radio_init, freq_upper, freq_lower, txpwr], shared = [position])]
     fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
-        //if *cx.local.radio_init == false {
+        if *cx.local.radio_init == false {
 
             // Init Radio --------------------------------------------------------------------------
             radio.swreset();
@@ -302,12 +302,12 @@ mod app {
             radio.set_freq_band(FREQBAND);
             radio.set_hb_sel(true);
             radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
-            radio.set_tx_pwr(si4032_driver::ETxPower::P5dBm);
+            radio.set_tx_pwr(si4032_driver::ETxPower::P11dBm);
 
             radio.set_cw();
 
             *cx.local.radio_init = true;
-        //}
+        }
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
