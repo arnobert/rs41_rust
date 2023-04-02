@@ -16,7 +16,7 @@ const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
 
 // Frequency, as calculated by Python script
 const HBSEL: bool = true;
-const FREQBAND: u8 = 0;
+const FREQBAND: u8 = 20;
 const CAR_FREQ: u16 = 0xE9A7;
 
 
@@ -299,12 +299,18 @@ mod app {
             radio.swreset();
 
             // Set frequencies
+            radio.set_hb_sel(false);
             radio.set_freq_band(FREQBAND);
-            radio.set_hb_sel(true);
             radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
+
+
             radio.set_tx_pwr(si4032_driver::ETxPower::P11dBm);
 
+            let fband = radio.get_freq_band();
             radio.set_cw();
+
+            cortex_m::asm::delay(10000);
+            radio.enter_tx();
 
             *cx.local.radio_init = true;
         }
