@@ -81,7 +81,7 @@ pub const SPIMODE: Mode = Mode {
 use cortex_m_rt::entry;
 use panic_halt as _;
 
-#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2])]
+#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3])]
 mod app {
     //use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
@@ -290,7 +290,7 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(local = [radio_spi, radio_init, freq_upper, freq_lower, txpwr], shared = [position])]
+    #[task(priority = 3, local = [radio_spi, radio_init, freq_upper, freq_lower, txpwr], shared = [position])]
     fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
         //if *cx.local.radio_init == false {
