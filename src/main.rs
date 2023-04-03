@@ -16,7 +16,7 @@ const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
 
 // Frequency, as calculated by Python script
 const HBSEL: bool = true;
-const FREQBAND: u8 = 0x20;
+const FREQBAND: u8 = 0x00;
 const CAR_FREQ: u16 = 0xE9A7;
 
 
