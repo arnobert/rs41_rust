@@ -297,6 +297,7 @@ mod app {
 
             // Init Radio --------------------------------------------------------------------------
             radio.swreset();
+            while !(radio.chip_ready()) {};
 
             // Set frequencies
             radio.set_hb_sel(false);
@@ -309,8 +310,8 @@ mod app {
             let fband = radio.get_freq_band();
             radio.set_cw();
 
-            cortex_m::asm::delay(10000);
-            radio.enter_tx();
+
+            //radio.enter_tx();
 
             *cx.local.radio_init = true;
         }
