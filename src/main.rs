@@ -96,7 +96,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL};
     use ublox::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
@@ -300,7 +300,7 @@ mod app {
             while !(radio.chip_ready()) {};
 
             // Set frequencies
-            radio.set_hb_sel(false);
+            radio.set_hb_sel(HBSEL);
             radio.set_freq_band(FREQBAND);
             radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
 
