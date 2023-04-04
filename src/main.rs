@@ -314,6 +314,7 @@ mod app {
             // Config for OOK ----------------------------------------------------------------------
             radio.set_modulation_type(si4032_driver::ModType::OOK);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
+            radio.set_data_rate(0x0008);
             radio.enter_tx();
             *cx.local.radio_init = true;
         }
@@ -323,6 +324,7 @@ mod app {
 
 
         radio.write_fifo(&tx_data);
+        radio.tx_on();
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
