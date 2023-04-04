@@ -20,7 +20,6 @@ const FREQBAND: u8 = 0x00;
 const CAR_FREQ: u16 = 0xE9A7;
 
 
-
 const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
 const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 // -------------------------------------------------------------------------------------------------
@@ -293,6 +292,8 @@ mod app {
     #[task(priority = 3, local = [radio_spi, radio_init, freq_upper, freq_lower, txpwr], shared = [position])]
     fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
+        let tx_data: [u8; 4] = [0xDE, 0xAD, 0xBE, 0xEF];
+
         if *cx.local.radio_init == false {
 
             // Init Radio --------------------------------------------------------------------------
@@ -305,22 +306,25 @@ mod app {
             radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
 
 
-            radio.set_tx_pwr(si4032_driver::ETxPower::P11dBm);
+            radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
 
             let fband = radio.get_freq_band();
-            radio.set_cw();
+            //radio.set_cw();
 
-
-            //radio.enter_tx();
-
+            // Config for OOK ----------------------------------------------------------------------
+            radio.set_modulation_type(si4032_driver::ModType::OOK);
+            radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
+            radio.enter_tx();
             *cx.local.radio_init = true;
         }
+
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
+
+        radio.write_fifo(&tx_data);
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
-
 
 
     // Receiving data from ublox. ------------------------------------------------------------------
@@ -342,7 +346,7 @@ mod app {
             cx.local.shutdown.set_high();
         }
 
-        if (vbat-pbut) < 100 {
+        if (vbat - pbut) < 100 {
             *cx.local.shutdown_next_cycle = true;
             cx.local.led_g.set_high();
         }
