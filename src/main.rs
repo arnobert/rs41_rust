@@ -4,7 +4,7 @@
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const _CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
+const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
@@ -95,7 +95,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, hell};
     use ublox::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
@@ -292,7 +292,7 @@ mod app {
     #[task(priority = 3, local = [radio_spi, radio_init, freq_upper, freq_lower, txpwr], shared = [position])]
     fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
-        let tx_data: [u8; 4] = [0xDE, 0xAD, 0xBE, 0xEF];
+
 
         if *cx.local.radio_init == false {
 
@@ -314,7 +314,7 @@ mod app {
             // Config for OOK ----------------------------------------------------------------------
             radio.set_modulation_type(si4032_driver::ModType::OOK);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
-            radio.set_data_rate(0x0008);
+            radio.set_data_rate(0x0002);
             radio.enter_tx();
             *cx.local.radio_init = true;
         }
@@ -322,10 +322,18 @@ mod app {
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
+        for txchar in CALLSIGN {
+            let txc128 = hell::get_char(txchar);
+            let txc8 = txc128.to_be_bytes();
 
-        radio.write_fifo(&tx_data);
-        radio.tx_on();
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+            radio.write_fifo(&txc8);
+            radio.tx_on();
+
+        }
+
+
+
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
     }
 
 
