@@ -5,7 +5,8 @@
 
 // CALLSIGN
 //const CALLSIGN: [char; 6] = [' ', ' ', ' ', ' ', ' ', ' '];
-const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
+const CALLSIGN: [char; 4] = ['X', 'X', 'X', 'X'];
+//const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
@@ -68,7 +69,6 @@ PC:
 15 : SPST 4
 
  */
-mod hell;
 
 use embedded_hal::spi::{Mode, Phase, Polarity};
 
@@ -96,7 +96,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, hell};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN};
     use ublox::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
@@ -315,7 +315,7 @@ mod app {
             // Config for OOK ----------------------------------------------------------------------
             radio.set_modulation_type(si4032_driver::ModType::OOK);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
-            radio.set_data_rate(0x0001);
+            radio.set_data_rate(0x0004);
 
             // Preamble
             radio.set_tx_prealen(0x0);
@@ -344,8 +344,7 @@ mod app {
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
         for txchar in CALLSIGN {
-            let txc128 = hell::get_char(txchar);
-            let txc8 = txc128.to_be_bytes();
+            let txc8: [u8; 1] = [txchar as u8];
             radio.write_fifo(&txc8);
         }
 
