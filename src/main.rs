@@ -4,6 +4,7 @@
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
+//const CALLSIGN: [char; 6] = [' ', ' ', ' ', ' ', ' ', ' '];
 const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 
 // TX PERIOD [s]
@@ -314,7 +315,27 @@ mod app {
             // Config for OOK ----------------------------------------------------------------------
             radio.set_modulation_type(si4032_driver::ModType::OOK);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
-            radio.set_data_rate(0x0002);
+            radio.set_data_rate(0x0001);
+
+            // Preamble
+            radio.set_tx_prealen(0x0);
+
+            // Sync Word
+            radio.set_tx_sync_len(0);
+
+
+            // TX Header
+            radio.set_tx_header_len(0);
+
+
+            // Packet Length
+            radio.set_packet_len(16);
+            radio.set_tx_fixplen(true);
+
+            // CRC
+            radio.set_crc(false);
+
+
             radio.enter_tx();
             *cx.local.radio_init = true;
         }
@@ -325,15 +346,14 @@ mod app {
         for txchar in CALLSIGN {
             let txc128 = hell::get_char(txchar);
             let txc8 = txc128.to_be_bytes();
-
             radio.write_fifo(&txc8);
-            radio.tx_on();
-
         }
 
+        if radio.is_tx_on() == false {
+            radio.tx_on();
+        }
 
-
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
 
