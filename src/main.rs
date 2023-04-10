@@ -4,9 +4,10 @@
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
+const CALLSIGN: [char; 1] = ['I'];
 //const CALLSIGN: [char; 6] = [' ', ' ', ' ', ' ', ' ', ' '];
 //const CALLSIGN: [char; 4] = ['X', 'X', 'X', 'X'];
-const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
+//const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
@@ -70,6 +71,8 @@ PC:
 
  */
 
+mod hell;
+
 use embedded_hal::spi::{Mode, Phase, Polarity};
 
 pub const SPIMODE: Mode = Mode {
@@ -96,7 +99,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, hell};
     use ublox::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
@@ -316,7 +319,7 @@ mod app {
             radio.set_modulation_type(si4032_driver::ModType::OOK);
             radio.set_auto_packet_handler(false);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
-            radio.set_data_rate(0x0002);
+            radio.set_data_rate(0x06);
 
             // Preamble
             radio.set_tx_prealen(0x0);
@@ -345,14 +348,26 @@ mod app {
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
         for txchar in CALLSIGN {
-            //let txc8: [u8; 1] = [txchar as u8];
-            let txc8: [u8; 1] = [0];
-            radio.write_fifo(&txc8);
+            let h_symbol: u128 = hell::get_char(txchar);
+            let h_bytes = h_symbol.to_be_bytes();
+
+            let mut txcnt: u8 = 13;
+            loop {
+                if txcnt == 0 {
+                    break;
+                }
+
+                let sym = [h_bytes[txcnt as usize]];
+                radio.write_fifo(&sym);
+
+                txcnt = txcnt - 1;
+            }
+
         }
 
-        if radio.is_tx_on() == false {
-            radio.tx_on();
-        }
+        //if radio.is_tx_on() == false {
+        //    radio.tx_on();
+        //}
 
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
