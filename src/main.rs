@@ -4,9 +4,9 @@
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const CALLSIGN: [char; 1] = ['I'];
+//const CALLSIGN: [char; 1] = ['X'];
 //const CALLSIGN: [char; 6] = [' ', ' ', ' ', ' ', ' ', ' '];
-//const CALLSIGN: [char; 4] = ['X', 'X', 'X', 'X'];
+const CALLSIGN: [char; 4] = ['.', '.', '.', '.'];
 //const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 
 // TX PERIOD [s]
@@ -316,18 +316,19 @@ mod app {
             //radio.set_cw();
 
             // Config for OOK ----------------------------------------------------------------------
-            //radio.set_modulation_type(si4032_driver::ModType::OOK);
+            radio.set_modulation_type(si4032_driver::ModType::OOK);
 
             // Config for FSK ----------------------------------------------------------------------
-            radio.set_modulation_type(si4032_driver::ModType::FSK);
-            radio.set_freq_deviation(0x01);
-            radio.set_freq_offset(0x002);
+            //radio.set_modulation_type(si4032_driver::ModType::FSK);
+            //radio.set_freq_deviation(0x01);
+            //radio.set_freq_offset(0x002);
 
             radio.set_auto_packet_handler(false);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             // @ Data Rate == 0x01: 1 bit = 75 ms
-            radio.set_data_rate(0x01);
+            // For Feld Hell we need 8.13 ms/pixel
+            radio.set_data_rate(0xA);
 
             // Preamble
             radio.set_tx_prealen(0x0);
@@ -355,26 +356,32 @@ mod app {
         // TEXT TO BE SENT:
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
-        /*
+        // OOK / HELL
+
         for txchar in CALLSIGN {
             let h_symbol: u128 = hell::get_char(txchar);
             let h_bytes = h_symbol.to_be_bytes();
 
-            let mut txcnt: u8 = 13;
+
+            let mut txcnt: u8 = 0;
             loop {
-                if txcnt == 0 {
+                if txcnt == 13 {
                     break;
                 }
 
                 let sym = [h_bytes[txcnt as usize]];
                 radio.write_fifo(&sym);
 
-                txcnt = txcnt - 1;
+                txcnt = txcnt + 1;
             }
 
         }
-        */
 
+
+
+
+        // FSK
+        /*
         let sym: [u8; 1] = [0xFF];
         let sym0: [u8; 1] = [0x00];
         radio.write_fifo(&sym);
@@ -382,6 +389,7 @@ mod app {
 
         radio.write_fifo(&sym);
         radio.write_fifo(&sym);
+        */
 
 
         if radio.is_tx_on() == false {
