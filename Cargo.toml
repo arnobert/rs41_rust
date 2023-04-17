@@ -18,3 +18,7 @@ si4032_driver = {version = "0.1.0", path = "../si4032_driver-rs"}
 [dependencies.stm32f1xx-hal]
 features = ["stm32f100", "rt", "medium"]
 version = "0.10.0"
+
+[profile.dev]
+
+[profile.release]
