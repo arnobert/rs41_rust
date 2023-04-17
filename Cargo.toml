@@ -20,5 +20,5 @@ features = ["stm32f100", "rt", "medium"]
 version = "0.10.0"
 
 [profile.dev]
-
+opt-level = "s"
 [profile.release]

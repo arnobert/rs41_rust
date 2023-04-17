@@ -138,6 +138,7 @@ mod app {
         adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
         shutdown: PA12<Output<PushPull>>,
         shutdown_next_cycle: bool,
+        gps_rx_buf: [u8; 64],
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -221,6 +222,8 @@ mod app {
         );
         let (mut gps_tx, mut gps_rx) = gps_serial.split();
 
+        let mut gps_rx_buf: [u8; 64] = [0; 64];
+
         // UBLOX -----------------------------------------------------------------------------------
         // Parser:
         let mut buf: Vec<u8, 8> = Vec::new();
@@ -258,8 +261,6 @@ mod app {
                 led_r: ledr,
                 led_g: ledg,
                 timer_handler: timer,
-                //gps_tx,
-                //gps_rx,
                 radio_spi: radioSPI,
                 radio_init: false,
                 freq_upper: F_C_UPPER,
@@ -270,6 +271,7 @@ mod app {
                 adc_1: adc1,
                 shutdown: shtdwn,
                 shutdown_next_cycle: false,
+                gps_rx_buf,
             },
             init::Monotonics(mono),
         )
@@ -419,13 +421,13 @@ mod app {
     }
 
     // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [position, gps_rx])]
+    #[task(binds = USART1, shared = [position, gps_rx], local = [gps_rx_buf])]
     fn receive_coordinates(mut cx: receive_coordinates::Context) {
-        let mut rx_dat;
-        //cx.shared.gps_rx.lock(|gps_rx| {
 
-            rx_dat = cx.shared.gps_rx.read();
-        //} );
+        let gps_rx_buf = cx.local.gps_rx_buf;
+        for rxc in 0..15 {
+            gps_rx_buf[rxc] = cx.shared.gps_rx.read().unwrap();
+        }
 
         cx.shared.position.lock(|position| {
             /* DO FOO HERE */
