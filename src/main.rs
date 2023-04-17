@@ -316,19 +316,22 @@ mod app {
             //radio.set_cw();
 
             // Config for OOK ----------------------------------------------------------------------
-            radio.set_modulation_type(si4032_driver::ModType::OOK);
+            //radio.set_modulation_type(si4032_driver::ModType::OOK);
 
             // Config for FSK ----------------------------------------------------------------------
-            //radio.set_modulation_type(si4032_driver::ModType::FSK);
-            //radio.set_freq_deviation(0x01);
+            radio.set_modulation_type(si4032_driver::ModType::GFSK);
+            // Setting 0x01 gives around 1.1 kHz deviation
+            radio.set_freq_deviation(0x05);
             //radio.set_freq_offset(0x002);
+            radio.set_trxdrtscale(true);
+            radio.set_data_rate(0x100);
 
             radio.set_auto_packet_handler(false);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             // @ Data Rate == 0x01: 1 bit = 75 ms
             // For Feld Hell we need 8.13 ms/pixel
-            radio.set_data_rate(0xA);
+            //radio.set_data_rate(0xA);
 
             // Preamble
             radio.set_tx_prealen(0x0);
@@ -357,7 +360,7 @@ mod app {
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
         // OOK / HELL
-
+        /*
         for txchar in CALLSIGN {
             let h_symbol: u128 = hell::get_char(txchar);
             let h_bytes = h_symbol.to_be_bytes();
@@ -374,22 +377,18 @@ mod app {
 
                 txcnt = txcnt + 1;
             }
-
         }
-
+        */
 
 
 
         // FSK
-        /*
-        let sym: [u8; 1] = [0xFF];
-        let sym0: [u8; 1] = [0x00];
-        radio.write_fifo(&sym);
-        radio.write_fifo(&sym);
+        let sym_0: [u8; 8] = [0,0,0,0,0xDE,0xAD,0xBE,0xEF];
+        //let sym_0: [u8; 2] = [0,0xFF];
+        //let sym= [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
 
-        radio.write_fifo(&sym);
-        radio.write_fifo(&sym);
-        */
+        radio.write_fifo(&sym_0);
+
 
 
         if radio.is_tx_on() == false {
@@ -400,14 +399,30 @@ mod app {
     }
 
 
+
+
+    // GPS -----------------------------------------------------------------------------------------
+    // Config ublox
+    #[task(local = [gps_tx])]
+    fn config_gps(mut cx: config_gps::Context) {
+        let mut tx = cx.local.gps_tx;
+        tx.write(0xB5);
+
+    }
+
     // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [position])]
+    #[task(binds = USART1, shared = [position], local = [gps_rx])]
     fn receive_coordinates(mut cx: receive_coordinates::Context) {
+        let rx = cx.local.gps_rx;
+
+        let xin = rx.read();
+
         cx.shared.position.lock(|position| {
             /* DO FOO HERE */
             *position = [23, 42, 100];
         });
     }
+
 
     // ADC measurements ----------------------------------------------------------------------------
     #[task(local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle, led_g])]
