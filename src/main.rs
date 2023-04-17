@@ -110,6 +110,10 @@ mod app {
     #[shared]
     struct Shared {
         position: [u32; 3],
+        #[lock_free]
+        gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
+        #[lock_free]
+        gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
     }
 
     #[local]
@@ -118,8 +122,7 @@ mod app {
         led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
 
-        gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
-        gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
+
 
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
@@ -248,13 +251,15 @@ mod app {
         (
             Shared {
                 position: [0, 0, 0],
+                gps_tx,
+                gps_rx,
             },
             Local {
                 led_r: ledr,
                 led_g: ledg,
                 timer_handler: timer,
-                gps_tx,
-                gps_rx,
+                //gps_tx,
+                //gps_rx,
                 radio_spi: radioSPI,
                 radio_init: false,
                 freq_upper: F_C_UPPER,
@@ -405,20 +410,22 @@ mod app {
 
     // GPS -----------------------------------------------------------------------------------------
     // Config ublox
-    #[task(local = [gps_tx])]
+    #[task(shared = [gps_tx, gps_rx])]
     fn config_gps(mut cx: config_gps::Context) {
-        let mut tx = cx.local.gps_tx;
-        tx.listen();
-        tx.write(0xB5);
+        cx.shared.gps_rx.listen();
+        cx.shared.gps_rx.listen_idle();
+        cx.shared.gps_tx.write(0x42);
 
     }
 
     // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [position], local = [gps_rx])]
+    #[task(binds = USART1, shared = [position, gps_rx])]
     fn receive_coordinates(mut cx: receive_coordinates::Context) {
-        let rx = cx.local.gps_rx;
+        let mut rx_dat;
+        //cx.shared.gps_rx.lock(|gps_rx| {
 
-        let xin = rx.read();
+            rx_dat = cx.shared.gps_rx.read();
+        //} );
 
         cx.shared.position.lock(|position| {
             /* DO FOO HERE */
