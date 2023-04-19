@@ -413,13 +413,12 @@ mod app {
     #[task(shared = [gps_tx, gps_rx])]
     fn config_gps(mut cx: config_gps::Context) {
         //Gen:
-        //let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 1, msg_id: 1, rates: [0, 0, 0, 0, 0, 0] }
-        //    .into_packet_bytes();
+        let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 0x06, msg_id: 0x02, rates: [0, 0, 0, 0, 0, 0] }
+            .into_packet_bytes();
 
-        const ubx_header: [u8; 2] = [0xB5, 0x62];
         cx.shared.gps_rx.listen();
         cx.shared.gps_rx.listen_idle();
-        for txc in ubx_header {
+        for txc in ubxcfg {
             cx.shared.gps_tx.write(txc);
         }
 
@@ -429,10 +428,10 @@ mod app {
     #[task(binds = USART1, shared = [position, gps_rx], local = [gps_rx_buf])]
     fn receive_coordinates(mut cx: receive_coordinates::Context) {
 
-        let gps_rx_buf = cx.local.gps_rx_buf;
-        for rxc in 0..15 {
-            gps_rx_buf[rxc] = cx.shared.gps_rx.read().unwrap();
-        }
+        //let gps_rx_buf = cx.local.gps_rx_buf;
+        //for rxc in 0..15 {
+        //    gps_rx_buf[rxc] = cx.shared.gps_rx.read().unwrap();
+        //}
 
         cx.shared.position.lock(|position| {
             /* DO FOO HERE */
