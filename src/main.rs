@@ -217,7 +217,7 @@ mod app {
             cx.device.USART1,
             (tx, rx),
             &mut afio.mapr,
-            Config::default().baudrate(57600.bps()),
+            Config::default().baudrate(9600.bps()),
             &clocks,
         );
         let (mut gps_tx, mut gps_rx) = gps_serial.split();
@@ -230,9 +230,6 @@ mod app {
         let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
         let mut parser = ublox::Parser::new(buf);
 
-        //Gen:
-        let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 1, msg_id: 1, rates: [0, 0, 0, 0, 0, 0] }
-            .into_packet_bytes();
 
         // USART3 (Expansion header)----------------------------------------------------------------
         let exp_tx = gpiob.pb11.into_alternate_push_pull(&mut gpiob.crh);
@@ -280,9 +277,10 @@ mod app {
 
     #[idle()]
     fn idle(cx: idle::Context) -> ! {
-        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
+        config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
+        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1100)).unwrap();
+        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1200)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -414,9 +412,16 @@ mod app {
     // Config ublox
     #[task(shared = [gps_tx, gps_rx])]
     fn config_gps(mut cx: config_gps::Context) {
+        //Gen:
+        //let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 1, msg_id: 1, rates: [0, 0, 0, 0, 0, 0] }
+        //    .into_packet_bytes();
+
+        const ubx_header: [u8; 2] = [0xB5, 0x62];
         cx.shared.gps_rx.listen();
         cx.shared.gps_rx.listen_idle();
-        cx.shared.gps_tx.write(0x42);
+        for txc in ubx_header {
+            cx.shared.gps_tx.write(txc);
+        }
 
     }
 
