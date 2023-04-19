@@ -27,6 +27,8 @@ const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
 const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 // -------------------------------------------------------------------------------------------------
 
+const rx_buf_size: usize = 128;
+
 /*   RS-41 pin description:
 PA:
 00 : NFC IN
@@ -86,6 +88,8 @@ use panic_halt as _;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3])]
 mod app {
+    use cortex_m::singleton;
+    use embedded_hal::adc::Channel;
     //use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
     use stm32f1xx_hal::{
@@ -99,8 +103,9 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, hell};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, hell, rx_buf_size};
     use ublox::*;
+    use tiny_nmea::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
     use stm32f1xx_hal::gpio::Analog;
@@ -112,8 +117,8 @@ mod app {
         position: [u32; 3],
         #[lock_free]
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
-        #[lock_free]
-        gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
+        //#[lock_free]
+        //gps_rx: stm32f1xx_hal::serial::RxDma1,
     }
 
     #[local]
@@ -138,7 +143,7 @@ mod app {
         adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
         shutdown: PA12<Output<PushPull>>,
         shutdown_next_cycle: bool,
-        gps_rx_buf: [u8; 64],
+        //rx_buf: [u8; rx_buf_size],
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -175,6 +180,7 @@ mod app {
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
         let mut gpioc = cx.device.GPIOC.split();
+        let channels = cx.device.DMA1.split();
 
         // LEDs ------------------------------------------------------------------------------------
         let mut ledr = gpiob
@@ -220,9 +226,13 @@ mod app {
             Config::default().baudrate(9600.bps()),
             &clocks,
         );
-        let (mut gps_tx, mut gps_rx) = gps_serial.split();
+        let mut gps_tx = gps_serial.tx;
+        let mut gps_rx = gps_serial.rx.with_dma(channels.5);
 
-        let mut gps_rx_buf: [u8; 64] = [0; 64];
+        let gps_rx_buf = singleton!(: [u8; rx_buf_size] = [0; rx_buf_size]).unwrap();
+
+        gps_rx.read(gps_rx_buf).wait();
+
 
         // UBLOX -----------------------------------------------------------------------------------
         // Parser:
@@ -252,7 +262,7 @@ mod app {
             Shared {
                 position: [0, 0, 0],
                 gps_tx,
-                gps_rx,
+                //gps_rx,
             },
             Local {
                 led_r: ledr,
@@ -268,7 +278,6 @@ mod app {
                 adc_1: adc1,
                 shutdown: shtdwn,
                 shutdown_next_cycle: false,
-                gps_rx_buf,
             },
             init::Monotonics(mono),
         )
@@ -410,14 +419,11 @@ mod app {
 
     // GPS -----------------------------------------------------------------------------------------
     // Config ublox
-    #[task(shared = [gps_tx, gps_rx])]
+    #[task(shared = [gps_tx])]
     fn config_gps(mut cx: config_gps::Context) {
         //Gen:
-        let ubxcfg = CfgMsgAllPortsBuilder { msg_class: 0x06, msg_id: 0x02, rates: [0, 0, 0, 0, 0, 0] }
-            .into_packet_bytes();
+        let ubxcfg:[u8; 8] =  [0xb5, 0x62, 0x06, 0x02, 0, 0, 0, 0];
 
-        cx.shared.gps_rx.listen();
-        cx.shared.gps_rx.listen_idle();
         for txc in ubxcfg {
             cx.shared.gps_tx.write(txc);
         }
@@ -425,16 +431,19 @@ mod app {
     }
 
     // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [position, gps_rx], local = [gps_rx_buf])]
+    #[task(binds = USART1, shared = [position])]
     fn receive_coordinates(mut cx: receive_coordinates::Context) {
 
-        //let gps_rx_buf = cx.local.gps_rx_buf;
-        //for rxc in 0..15 {
-        //    gps_rx_buf[rxc] = cx.shared.gps_rx.read().unwrap();
+        //for rxc in 0..(rx_buf_size-1) {
+            //if rx_char == 0x0a {
+            //    break;
+            //}
+            //cx.local.rx_buf[rxc] =
         //}
 
+
         cx.shared.position.lock(|position| {
-            /* DO FOO HERE */
+        //    /* DO FOO HERE */
             *position = [23, 42, 100];
         });
     }

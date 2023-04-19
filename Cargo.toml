@@ -14,6 +14,7 @@ ublox = { version = "0.4.2", default-features = false }
 heapless = "0.7.16"
 systick-monotonic = "1.0.1"
 si4032_driver = {version = "0.1.0", path = "../si4032_driver-rs"}
+tiny-nmea = "0.1.0"
 
 [dependencies.stm32f1xx-hal]
 features = ["stm32f100", "rt", "medium"]
