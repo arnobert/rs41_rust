@@ -127,8 +127,6 @@ mod app {
         led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
 
-
-
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
@@ -229,16 +227,16 @@ mod app {
         let mut gps_tx = gps_serial.tx;
         let mut gps_rx = gps_serial.rx.with_dma(channels.5);
 
-        let gps_rx_buf = singleton!(: [u8; rx_buf_size] = [0; rx_buf_size]).unwrap();
+        //let gps_rx_buf = singleton!(: [u8; rx_buf_size] = [0; rx_buf_size]).unwrap();
 
-        gps_rx.read(gps_rx_buf).wait();
+        //gps_rx.read(gps_rx_buf).wait();
 
 
         // UBLOX -----------------------------------------------------------------------------------
         // Parser:
-        let mut buf: Vec<u8, 8> = Vec::new();
-        let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
-        let mut parser = ublox::Parser::new(buf);
+        //let mut buf: Vec<u8, 8> = Vec::new();
+        //let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
+        //let mut parser = ublox::Parser::new(buf);
 
 
         // USART3 (Expansion header)----------------------------------------------------------------
@@ -313,7 +311,6 @@ mod app {
 
 
         if *cx.local.radio_init == false {
-
             config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
 
             // Init Radio --------------------------------------------------------------------------
@@ -397,14 +394,12 @@ mod app {
         */
 
 
-
         // FSK
-        let sym_0: [u8; 8] = [0,0,0,0,0xDE,0xAD,0xBE,0xEF];
+        let sym_0: [u8; 8] = [0, 0, 0, 0, 0xDE, 0xAD, 0xBE, 0xEF];
         //let sym_0: [u8; 2] = [0,0xFF];
         //let sym= [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
 
         radio.write_fifo(&sym_0);
-
 
 
         if radio.is_tx_on() == false {
@@ -415,38 +410,35 @@ mod app {
     }
 
 
-
-
     // GPS -----------------------------------------------------------------------------------------
     // Config ublox
     #[task(shared = [gps_tx])]
     fn config_gps(mut cx: config_gps::Context) {
-        //Gen:
-        let ubxcfg:[u8; 8] =  [0xb5, 0x62, 0x06, 0x02, 0, 0, 0, 0];
+        //Setting UBX protocol:
+        let ubxcfg: [u8; 26] = [0xb5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00,
+            0xD0, 0x08, 0x00, 0x00, 0x00, 0xE1, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
+            0x00, 0x00, 0xD6, 0x8D];
 
-        for txc in ubxcfg {
-            cx.shared.gps_tx.write(txc);
-        }
-
+        cx.shared.gps_tx.bwrite_all(&ubxcfg);
     }
 
     // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [position])]
-    fn receive_coordinates(mut cx: receive_coordinates::Context) {
+    //#[task(binds = USART1, shared = [position])]
+    //fn receive_coordinates(mut cx: receive_coordinates::Context) {
 
-        //for rxc in 0..(rx_buf_size-1) {
-            //if rx_char == 0x0a {
-            //    break;
-            //}
-            //cx.local.rx_buf[rxc] =
-        //}
+    //for rxc in 0..(rx_buf_size-1) {
+    //if rx_char == 0x0a {
+    //    break;
+    //}
+    //cx.local.rx_buf[rxc] =
+    //}
 
 
-        cx.shared.position.lock(|position| {
-        //    /* DO FOO HERE */
-            *position = [23, 42, 100];
-        });
-    }
+    //    cx.shared.position.lock(|position| {
+    //    /* DO FOO HERE */
+    //        *position = [23, 42, 100];
+    //    });
+    //}
 
 
     // ADC measurements ----------------------------------------------------------------------------
