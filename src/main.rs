@@ -92,6 +92,7 @@ mod app {
     use embedded_hal::adc::Channel;
     //use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
+    use nb::block;
     use stm32f1xx_hal::{
         adc::*,
         gpio::{gpioa::*, gpiob::*, gpioc::*,
@@ -109,6 +110,7 @@ mod app {
     use si4032_driver::ETxPower;
     use stm32f1xx_hal::gpio::Analog;
     use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
+    use stm32f1xx_hal::serial::ReleaseToken;
 
     //----------------------------------------------------------------------------------------------
     #[shared]
@@ -224,7 +226,10 @@ mod app {
             &clocks,
         );
         let mut gps_tx = gps_serial.tx;
+        gps_tx.unlisten();
         let mut gps_rx = gps_serial.rx;
+        gps_rx.listen();
+        //gps_rx.unlisten_idle();
 
         // UBLOX -----------------------------------------------------------------------------------
         // Parser:
@@ -282,6 +287,7 @@ mod app {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1100)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1200)).unwrap();
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -303,10 +309,18 @@ mod app {
     fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
 
+        // Getting position data
+        let mut position = cx.shared.position;
+        let mut position_X: u8 = 0;
 
+        position.lock(|position| {
+            position_X = position[0] as u8;
+        });
+
+
+        // Init Radio ------------------------------------------------------------------------------
         if *cx.local.radio_init == false {
 
-            // Init Radio --------------------------------------------------------------------------
             radio.swreset();
             while !(radio.chip_ready()) {};
 
@@ -388,7 +402,7 @@ mod app {
 
 
         // FSK
-        let sym_0: [u8; 8] = [0, 0, 0, 0, 0xDE, 0xAD, 0xBE, 0xEF];
+        let sym_0: [u8; 8] = [position_X, 0, 0, 0, 0xDE, 0xAD, 0xBE, 0xEF];
         //let sym_0: [u8; 2] = [0,0xFF];
         //let sym= [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
 
@@ -405,9 +419,8 @@ mod app {
 
     // GPS -----------------------------------------------------------------------------------------
     // Config ublox
-    #[task(shared = [gps_tx])]
+    #[task(shared = [gps_tx, gps_rx])]
     fn config_gps(mut cx: config_gps::Context) {
-
         let packet: [u8; 28] = CfgPrtUartBuilder {
             portid: UartPortId::Uart1,
             reserved0: 0,
@@ -422,26 +435,52 @@ mod app {
 
         cx.shared.gps_tx.bwrite_all(&packet);
         cx.shared.gps_tx.flush();
-
     }
 
+
+    #[task(shared = [gps_tx, gps_rx])]
+    fn query_pos(mut cx: query_pos::Context) {
+        let packet: [u8; 28] = CfgPrtUartBuilder {
+            portid: UartPortId::Uart1,
+            reserved0: 0,
+            tx_ready: 0,
+            mode: 0x8d0,
+            baud_rate: 9600,
+            in_proto_mask: 0x01,
+            out_proto_mask: 0x01,
+            flags: 0,
+            reserved5: 0,
+        }.into_packet_bytes();
+
+        cx.shared.gps_tx.bwrite_all(&packet);
+        cx.shared.gps_tx.flush();
+        query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
+    }
+
+
     // Receiving data from ublox. ------------------------------------------------------------------
-    //#[task(binds = USART1, shared = [position])]
-    //fn receive_coordinates(mut cx: receive_coordinates::Context) {
+    #[task(binds = USART1, shared = [position, gps_rx])]
+    fn receive_coordinates(mut cx: receive_coordinates::Context) {
 
-    //for rxc in 0..(rx_buf_size-1) {
-    //if rx_char == 0x0a {
-    //    break;
-    //}
-    //cx.local.rx_buf[rxc] =
-    //}
+        let rx = cx.shared.gps_rx;
+        #[no_mangle]
+        let mut pos = cx.shared.position;
 
+        let mut rxb: Result<u8, stm32f1xx_hal::serial::Error> = Ok(0);
 
-    //    cx.shared.position.lock(|position| {
-    //    /* DO FOO HERE */
-    //        *position = [23, 42, 100];
-    //    });
-    //}
+        if rx.is_rx_not_empty() {
+            rxb = block!(rx.read());
+        }
+
+        let posx: u8 = match rxb {
+            Ok(rxb) => rxb as u8,
+            Err(E) => 0,
+        };
+
+        pos.lock(|pos| {
+            pos[0] = posx as u32;
+        });
+    }
 
 
     // ADC measurements ----------------------------------------------------------------------------
