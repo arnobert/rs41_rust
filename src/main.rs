@@ -105,7 +105,6 @@ mod app {
     };
     use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, hell, rx_buf_size};
     use ublox::*;
-    use tiny_nmea::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
     use stm32f1xx_hal::gpio::Analog;
