@@ -6,7 +6,7 @@
 
 ## Obtaining the sonde
 The web contains lots of information about how to get and program a RS41.
-I am using a standard NXP LPC Link 2 works with an adapter.
+I am using a standard NXP LPC Link 2 with CMSIS-DAP firmware works with an adapter.
 
 **_Please unsolder and remove the antenna before first programming!_** 
 
@@ -19,3 +19,18 @@ See documentation: https://github.com/bazjo/radiosonde_hardware/tree/master/Vais
 ## Goals, requirements
 For a planned HAB launch the sonde has to transmit its location (coordinates and altitude).
 We would like to use GFSK and (optional) Hellschreiber mode as the Si4032 transmitter also supports OOK.
+
+## Building
+
+```
+$ git clone https://github.com/arnobert/rs41_rust
+$ git clone https://github.com/arnobert/si4032_driver-rs
+$ cd rs41_rust
+$ cargo build
+```
+
+Flashing the sonde:
+```
+$ cargo embed
+```
+Cargo embed auto-detects the LPC Link.
