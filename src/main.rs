@@ -310,7 +310,6 @@ mod app {
 
 
         if *cx.local.radio_init == false {
-            config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
 
             // Init Radio --------------------------------------------------------------------------
             radio.swreset();
