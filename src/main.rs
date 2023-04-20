@@ -116,8 +116,8 @@ mod app {
         position: [u32; 3],
         #[lock_free]
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
-        //#[lock_free]
-        //gps_rx: stm32f1xx_hal::serial::RxDma1,
+        #[lock_free]
+        gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
     }
 
     #[local]
@@ -224,12 +224,7 @@ mod app {
             &clocks,
         );
         let mut gps_tx = gps_serial.tx;
-        let mut gps_rx = gps_serial.rx.with_dma(channels.5);
-
-        //let gps_rx_buf = singleton!(: [u8; rx_buf_size] = [0; rx_buf_size]).unwrap();
-
-        //gps_rx.read(gps_rx_buf).wait();
-
+        let mut gps_rx = gps_serial.rx;
 
         // UBLOX -----------------------------------------------------------------------------------
         // Parser:
@@ -259,7 +254,7 @@ mod app {
             Shared {
                 position: [0, 0, 0],
                 gps_tx,
-                //gps_rx,
+                gps_rx,
             },
             Local {
                 led_r: ledr,
@@ -412,12 +407,22 @@ mod app {
     // Config ublox
     #[task(shared = [gps_tx])]
     fn config_gps(mut cx: config_gps::Context) {
-        //Setting UBX protocol:
-        let ubxcfg: [u8; 26] = [0xb5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00,
-            0xD0, 0x08, 0x00, 0x00, 0x00, 0xE1, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
-            0x00, 0x00, 0xD6, 0x8D];
 
-        cx.shared.gps_tx.bwrite_all(&ubxcfg);
+        let packet: [u8; 28] = CfgPrtUartBuilder {
+            portid: UartPortId::Uart1,
+            reserved0: 0,
+            tx_ready: 0,
+            mode: 0x8d0,
+            baud_rate: 9600,
+            in_proto_mask: 0x01,
+            out_proto_mask: 0x01,
+            flags: 0,
+            reserved5: 0,
+        }.into_packet_bytes();
+
+        cx.shared.gps_tx.bwrite_all(&packet);
+        cx.shared.gps_tx.flush();
+
     }
 
     // Receiving data from ublox. ------------------------------------------------------------------
