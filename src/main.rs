@@ -72,6 +72,7 @@ mod app {
     use stm32f1xx_hal::gpio::Analog;
     use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
     use stm32f1xx_hal::serial::ReleaseToken;
+    use ublox::PacketRef::NavStatus;
 
     //----------------------------------------------------------------------------------------------
     #[shared]
@@ -281,7 +282,6 @@ mod app {
 
         // Init Radio ------------------------------------------------------------------------------
         if *cx.local.radio_init == false {
-
             radio.swreset();
             while !(radio.chip_ready()) {};
 
@@ -401,19 +401,9 @@ mod app {
 
     #[task(shared = [gps_tx, gps_rx])]
     fn query_pos(mut cx: query_pos::Context) {
-        let packet: [u8; 28] = CfgPrtUartBuilder {
-            portid: UartPortId::Uart1,
-            reserved0: 0,
-            tx_ready: 0,
-            mode: 0x8d0,
-            baud_rate: 9600,
-            in_proto_mask: 0x01,
-            out_proto_mask: 0x01,
-            flags: 0,
-            reserved5: 0,
-        }.into_packet_bytes();
-
+        let packet = UbxPacketRequest::request_for::<NavOdo>().into_packet_bytes();
         cx.shared.gps_tx.bwrite_all(&packet);
+
         cx.shared.gps_tx.flush();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
     }
@@ -422,10 +412,9 @@ mod app {
     // Receiving data from ublox. ------------------------------------------------------------------
     #[task(binds = USART1, shared = [position, gps_rx])]
     fn receive_coordinates(mut cx: receive_coordinates::Context) {
-
         let rx = cx.shared.gps_rx;
         #[no_mangle]
-        let mut pos = cx.shared.position;
+            let mut pos = cx.shared.position;
 
         let mut rxb: Result<u8, stm32f1xx_hal::serial::Error> = Ok(0);
 
