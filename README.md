@@ -28,6 +28,10 @@ $ git clone https://github.com/arnobert/si4032_driver-rs
 $ cd rs41_rust
 $ cargo build
 ```
+With Hellschreiber mode:
+```
+$ cargo build --features "hell"
+```
 
 Flashing the sonde:
 ```
