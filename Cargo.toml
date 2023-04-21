@@ -15,6 +15,9 @@ systick-monotonic = "1.0.1"
 si4032_driver = {version = "0.1.0", path = "../si4032_driver-rs"}
 nb = "1.1.0"
 
+[features]
+hell = []
+
 [dependencies.stm32f1xx-hal]
 features = ["stm32f100", "rt", "medium"]
 version = "0.10.0"

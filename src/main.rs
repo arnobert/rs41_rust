@@ -29,6 +29,8 @@ const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 
 const rx_buf_size: usize = 128;
 
+
+#[cfg(feature = "hell")]
 mod hell;
 
 use embedded_hal::spi::{Mode, Phase, Polarity};
@@ -60,7 +62,10 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, hell, rx_buf_size};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, rx_buf_size};
+    #[cfg(feature = "hell")]
+    use crate::hell;
+
     use ublox::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
