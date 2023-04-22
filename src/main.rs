@@ -141,6 +141,13 @@ mod app {
         let mut gpioc = cx.device.GPIOC.split();
         let channels = cx.device.DMA1.split();
 
+        // Disable JTAG ----------------------------------------------------------------------------
+        let (pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
+
+        // GPIO ------------------------------------------------------------------------------------
+        let mut spst_1 = gpiob.pb6.into_floating_input(&mut gpiob.crl);
+        //spst_1 = gpiob.pb6.into_open_drain_output(&mut gpiob.crl);
+
         // LEDs ------------------------------------------------------------------------------------
         let mut ledr = gpiob
             .pb8
