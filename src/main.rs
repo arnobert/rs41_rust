@@ -210,6 +210,8 @@ mod app {
         let adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
 
 
+        let adc1_ch1 = gpioa.pa1.into_analog(&mut gpioa.crl); // Measurement out
+
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
