@@ -146,7 +146,9 @@ mod app {
 
         // GPIO ------------------------------------------------------------------------------------
         let mut spst_1 = gpiob.pb6.into_floating_input(&mut gpiob.crl);
-        let spst_2 = spst_1.into_open_drain_output(&mut gpiob.crl);
+        let mut spst_2 = spst_1.into_open_drain_output(&mut gpiob.crl);
+
+        spst_2.set_low();
 
         // LEDs ------------------------------------------------------------------------------------
         let mut ledr = gpiob
