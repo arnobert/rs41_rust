@@ -186,6 +186,7 @@ mod app {
         // USART1 ----------------------------------------------------------------------------------
         let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
         let rx = gpioa.pa10;
+        let mut gps_rstn = pa15.into_open_drain_output(&mut gpioa.crh);
 
         let mut gps_serial = Serial::new(
             cx.device.USART1,
