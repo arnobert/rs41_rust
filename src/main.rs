@@ -209,9 +209,16 @@ mod app {
 
 
         // USART3 (Expansion header)----------------------------------------------------------------
-        let exp_tx = gpiob.pb11.into_alternate_push_pull(&mut gpiob.crh);
-        let exp_rx = gpiob.pb10;
+        let exp_tx = gpiob.pb10.into_alternate_push_pull(&mut gpiob.crh);
+        let exp_rx = gpiob.pb11;
 
+        let mut dbg_serial = Serial::new(
+            cx.device.USART3,
+            (exp_tx, exp_rx),
+            &mut afio.mapr,
+            Config::default().baudrate(9600.bps()),
+            &clocks,
+        );
 
         // ADC -------------------------------------------------------------------------------------
         let adc_ch0 = gpioa.pa5.into_analog(&mut gpioa.crl); // Battery voltage
