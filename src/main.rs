@@ -144,7 +144,9 @@ mod app {
         let channels = cx.device.DMA1.split();
 
         // Disable JTAG ----------------------------------------------------------------------------
-        let (pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
+        let (mut pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
+
+        let mut gps_rstn = pa15.into_open_drain_output_with_state(&mut gpioa.crh, PinState::High);
 
         // GPIO ------------------------------------------------------------------------------------
         let mut spst_1 = gpiob.pb6.into_floating_input(&mut gpiob.crl);
@@ -188,7 +190,6 @@ mod app {
         // USART1 ----------------------------------------------------------------------------------
         let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
         let rx = gpioa.pa10;
-        let mut gps_rstn = pa15.into_open_drain_output(&mut gpioa.crh);
 
         let mut gps_serial = Serial::new(
             cx.device.USART1,
@@ -424,7 +425,7 @@ mod app {
 
     #[task(shared = [gps_tx, gps_rx])]
     fn query_pos(mut cx: query_pos::Context) {
-        let packet = UbxPacketRequest::request_for::<NavStatus>().into_packet_bytes();
+        let packet = UbxPacketRequest::request_for::<CfgMsgAllPorts>().into_packet_bytes();
         cx.shared.gps_tx.bwrite_all(&packet);
         cx.shared.gps_tx.flush();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
