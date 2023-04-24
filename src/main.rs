@@ -102,7 +102,7 @@ mod app {
         adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
         shutdown: PA12<Output<PushPull>>,
         shutdown_next_cycle: bool,
-        //rx_buf: [u8; rx_buf_size],
+        rx_buf: Vec<u8, rx_buf_size>,
         dbg_tx: stm32f1xx_hal::serial::Tx<USART3>,
         dbg_rx: stm32f1xx_hal::serial::Rx<USART3>,
     }
@@ -206,7 +206,7 @@ mod app {
 
         // UBLOX -----------------------------------------------------------------------------------
         // Parser:
-        //let mut buf: Vec<u8, 8> = Vec::new();
+        let mut rxbuf: Vec<u8, rx_buf_size> = Vec::new();
         //let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
         //let mut parser = ublox::Parser::new(buf);
 
@@ -259,6 +259,7 @@ mod app {
                 adc_1: adc1,
                 shutdown: shtdwn,
                 shutdown_next_cycle: false,
+                rx_buf: rxbuf,
                 dbg_tx: dbg_tx,
                 dbg_rx: dbg_rx,
             },
@@ -433,26 +434,41 @@ mod app {
 
 
     // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [position, gps_rx])]
-    fn receive_coordinates(mut cx: receive_coordinates::Context) {
+    #[task(binds = USART1, shared = [position, gps_rx], local = [rx_buf])]
+    fn receive_gps_dx(mut cx: receive_gps_dx::Context) {
+        let rx_buf = cx.local.rx_buf;
         let rx = cx.shared.gps_rx;
-        #[no_mangle]
-            let mut pos = cx.shared.position;
+        let mut pos = cx.shared.position;
 
-        let mut rxb: Result<u8, stm32f1xx_hal::serial::Error> = Ok(0);
+        rx_buf.clear();
 
-        if rx.is_rx_not_empty() {
-            rxb = block!(rx.read());
+        loop {
+            let mut rxb = rx.read();
+            match rxb {
+                Ok(T) => {
+                    rx_buf.push(T);
+                },
+                Err(E) => {
+                    match E {
+                        nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {},
+                        nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {},
+                        nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {},
+                        nb::Error::Other(stm32f1xx_hal::serial::Error::Parity) => {},
+                        _ => {},
+                    }
+                }
+            }
+            if !rx.is_rx_not_empty() {
+                break;
+            }
         }
 
-        let posx: u8 = match rxb {
-            Ok(rxb) => rxb as u8,
-            Err(E) => 0,
+        if rx_buf.len() > 0 {
+            pos.lock(|pos| {
+                pos[0] = rx_buf[0] as u32;
+            });
         };
 
-        pos.lock(|pos| {
-            pos[0] = posx as u32;
-        });
     }
 
 
@@ -479,6 +495,6 @@ mod app {
     // Debug UART ----------------------------------------------------------------------------------
     #[task(local = [dbg_tx])]
     fn print_dbg(cx: print_dbg::Context, msg: u8) {
-        cx.local.dbg_tx.write(0x42);
+        cx.local.dbg_tx.write(msg);
     }
 }
