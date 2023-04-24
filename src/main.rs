@@ -425,7 +425,7 @@ mod app {
 
     #[task(shared = [gps_tx, gps_rx])]
     fn query_pos(mut cx: query_pos::Context) {
-        let packet = UbxPacketRequest::request_for::<CfgMsgAllPorts>().into_packet_bytes();
+        let packet = UbxPacketRequest::request_for::<NavStatus>().into_packet_bytes();
         cx.shared.gps_tx.bwrite_all(&packet);
         cx.shared.gps_tx.flush();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
