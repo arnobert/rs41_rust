@@ -103,6 +103,8 @@ mod app {
         shutdown: PA12<Output<PushPull>>,
         shutdown_next_cycle: bool,
         //rx_buf: [u8; rx_buf_size],
+        dbg_tx: stm32f1xx_hal::serial::Tx<USART3>,
+        dbg_rx: stm32f1xx_hal::serial::Rx<USART3>,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -219,6 +221,8 @@ mod app {
             Config::default().baudrate(9600.bps()),
             &clocks,
         );
+        let mut dbg_tx = dbg_serial.tx;
+        let mut dbg_rx = dbg_serial.rx;
 
         // ADC -------------------------------------------------------------------------------------
         let adc_ch0 = gpioa.pa5.into_analog(&mut gpioa.crl); // Battery voltage
@@ -254,6 +258,8 @@ mod app {
                 adc_1: adc1,
                 shutdown: shtdwn,
                 shutdown_next_cycle: false,
+                dbg_tx: dbg_tx,
+                dbg_rx: dbg_rx,
             },
             init::Monotonics(mono),
         )
@@ -464,6 +470,14 @@ mod app {
             cx.local.led_g.set_high();
         }
 
+        print_dbg::spawn_after(Duration::<u64, 1, 1000>::from_ticks(500), 0x00).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
+    }
+
+
+    // Debug UART ----------------------------------------------------------------------------------
+    #[task(local = [dbg_tx])]
+    fn print_dbg(cx: print_dbg::Context, msg: u8) {
+        cx.local.dbg_tx.write(0x42);
     }
 }
