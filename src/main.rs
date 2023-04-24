@@ -204,11 +204,7 @@ mod app {
         gps_rx.listen();
         //gps_rx.unlisten_idle();
 
-        // UBLOX -----------------------------------------------------------------------------------
-        // Parser:
         let mut rxbuf: Vec<u8, rx_buf_size> = Vec::new();
-        //let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
-        //let mut parser = ublox::Parser::new(buf);
 
 
         // USART3 (Expansion header)----------------------------------------------------------------
@@ -436,14 +432,16 @@ mod app {
     // Receiving data from ublox. ------------------------------------------------------------------
     #[task(binds = USART1, shared = [position, gps_rx], local = [rx_buf])]
     fn receive_gps_dx(mut cx: receive_gps_dx::Context) {
-        let rx_buf = cx.local.rx_buf;
+        let mut rx_buf = cx.local.rx_buf;
         let rx = cx.shared.gps_rx;
         let mut pos = cx.shared.position;
+
+
 
         rx_buf.clear();
 
         loop {
-            let mut rxb = rx.read();
+            let rxb = rx.read();
             match rxb {
                 Ok(T) => {
                     rx_buf.push(T);
@@ -463,11 +461,13 @@ mod app {
             }
         }
 
-        if rx_buf.len() > 0 {
-            pos.lock(|pos| {
-                pos[0] = rx_buf[0] as u32;
-            });
-        };
+
+        // UBLOX -----------------------------------------------------------------------------------
+        //let ubxbuf = ublox::FixedLinearBuffer::new(&mut rx_buf[..]);
+        //let mut parser = ublox::Parser::new(ubxbuf);
+        //if rx_buf.len() > 0 {
+        //    parser.consume(&mut rx_buf);
+        //};
 
     }
 
