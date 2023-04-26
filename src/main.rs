@@ -445,14 +445,14 @@ mod app {
         match rxb {
             Ok(T) => {
                 process_gps_data::spawn(T).unwrap();
-            },
+            }
             Err(E) => {
                 match E {
-                    nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {},
-                    nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {},
-                    nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {},
-                    nb::Error::Other(stm32f1xx_hal::serial::Error::Parity) => {},
-                    _ => {},
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {}
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {}
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {}
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Parity) => {}
+                    _ => {}
                 }
             }
         }
@@ -466,8 +466,8 @@ mod app {
         let mut msg_len: u8 = 0;
 
         // Writing into rx buffer
-        if(*start_detect == true) {
-            rx_buf.lock(|rx_buf|{
+        if (*start_detect == true) {
+            rx_buf.lock(|rx_buf| {
                 rx_buf.push(rxd);
 
                 let bufp = rx_buf.len() as u8;
@@ -476,12 +476,10 @@ mod app {
 
                     // Message complete
                     if (bufp > (msg_len + 2)) {
-                         print_dbg::spawn(0x10);
+                        print_dbg::spawn(0x10);
                         *start_detect = false;
                     }
                 };
-
-
             });
         }
 
@@ -489,14 +487,13 @@ mod app {
         if ((!*start_detect) && (*rxd1 == 0xB5) && (rxd == 0x62)) {
             *start_detect = true;
 
-            rx_buf.lock(|rx_buf|{
+            rx_buf.lock(|rx_buf| {
                 rx_buf.clear()
             });
         }
 
         // *Shift register*
         *rxd1 = rxd;
-
     }
 
     // ADC measurements ----------------------------------------------------------------------------
@@ -531,7 +528,7 @@ mod app {
 
             // Print RX buffer
             if msg == 0x10 {
-                for c in rx_buf {
+                for c in rx_buf.iter() {
                     dbg_tx.write(*c);
                 };
             }
@@ -540,6 +537,5 @@ mod app {
             //    dbg_tx.write(msg);
             //}
         });
-
     }
 }
