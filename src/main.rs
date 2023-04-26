@@ -44,7 +44,7 @@ pub const SPIMODE: Mode = Mode {
 use cortex_m_rt::entry;
 use panic_halt as _;
 
-#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3])]
+#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3, TIM4])]
 mod app {
     use cortex_m::singleton;
     use embedded_hal::adc::Channel;
@@ -80,6 +80,7 @@ mod app {
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         #[lock_free]
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
+        rx_buf: Vec<u8, rx_buf_size>,
     }
 
     #[local]
@@ -102,9 +103,10 @@ mod app {
         adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
         shutdown: PA12<Output<PushPull>>,
         shutdown_next_cycle: bool,
-        rx_buf: Vec<u8, rx_buf_size>,
         dbg_tx: stm32f1xx_hal::serial::Tx<USART3>,
         dbg_rx: stm32f1xx_hal::serial::Rx<USART3>,
+        rxd_t1: u8,
+        st_det: bool,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -233,6 +235,9 @@ mod app {
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
+        // State machine for UART receiver ---------------------------------------------------------
+        let mut rxd1: u8 = 0;
+        let mut stdet: bool = false;
 
         // End init --------------------------------------------------------------------------------
         (
@@ -240,6 +245,7 @@ mod app {
                 position: [0, 0, 0],
                 gps_tx,
                 gps_rx,
+                rx_buf: rxbuf,
             },
             Local {
                 led_r: ledr,
@@ -255,9 +261,10 @@ mod app {
                 adc_1: adc1,
                 shutdown: shtdwn,
                 shutdown_next_cycle: false,
-                rx_buf: rxbuf,
                 dbg_tx: dbg_tx,
                 dbg_rx: dbg_rx,
+                rxd_t1: rxd1,
+                st_det: stdet,
             },
             init::Monotonics(mono),
         )
@@ -430,47 +437,67 @@ mod app {
 
 
     // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [position, gps_rx], local = [rx_buf])]
+    #[task(binds = USART1, shared = [gps_rx])]
     fn receive_gps_dx(mut cx: receive_gps_dx::Context) {
-        let mut rx_buf = cx.local.rx_buf;
         let rx = cx.shared.gps_rx;
-        let mut pos = cx.shared.position;
 
-
-
-        rx_buf.clear();
-
-        loop {
-            let rxb = rx.read();
-            match rxb {
-                Ok(T) => {
-                    rx_buf.push(T);
-                },
-                Err(E) => {
-                    match E {
-                        nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {},
-                        nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {},
-                        nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {},
-                        nb::Error::Other(stm32f1xx_hal::serial::Error::Parity) => {},
-                        _ => {},
-                    }
+        let rxb = rx.read();
+        match rxb {
+            Ok(T) => {
+                process_gps_data::spawn(T).unwrap();
+            },
+            Err(E) => {
+                match E {
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {},
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {},
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {},
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Parity) => {},
+                    _ => {},
                 }
             }
-            if !rx.is_rx_not_empty() {
-                break;
-            }
         }
-
-
-        // UBLOX -----------------------------------------------------------------------------------
-        //let ubxbuf = ublox::FixedLinearBuffer::new(&mut rx_buf[..]);
-        //let mut parser = ublox::Parser::new(ubxbuf);
-        //if rx_buf.len() > 0 {
-        //    parser.consume(&mut rx_buf);
-        //};
-
     }
 
+    #[task(shared = [rx_buf], local = [rxd_t1, st_det])]
+    fn process_gps_data(cx: process_gps_data::Context, rxd: u8) {
+        let mut rx_buf = cx.shared.rx_buf;
+        let mut rxd1 = cx.local.rxd_t1;
+        let mut start_detect = cx.local.st_det;
+        let mut msg_len: u8 = 0;
+
+        // Writing into rx buffer
+        if(*start_detect == true) {
+            rx_buf.lock(|rx_buf|{
+                rx_buf.push(rxd);
+
+                let bufp = rx_buf.len() as u8;
+                if bufp > 3 {
+                    msg_len = rx_buf[2];
+
+                    // Message complete
+                    if (bufp > (msg_len + 2)) {
+                         print_dbg::spawn(0x10);
+                        *start_detect = false;
+                    }
+                };
+
+
+            });
+        }
+
+        // Detecting magic word 0xB5 0x62
+        if ((!*start_detect) && (*rxd1 == 0xB5) && (rxd == 0x62)) {
+            *start_detect = true;
+
+            rx_buf.lock(|rx_buf|{
+                rx_buf.clear()
+            });
+        }
+
+        // *Shift register*
+        *rxd1 = rxd;
+
+    }
 
     // ADC measurements ----------------------------------------------------------------------------
     #[task(local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle, led_g])]
@@ -487,14 +514,32 @@ mod app {
             cx.local.led_g.set_high();
         }
 
-        print_dbg::spawn_after(Duration::<u64, 1, 1000>::from_ticks(500), 0x00).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
     }
 
 
     // Debug UART ----------------------------------------------------------------------------------
-    #[task(local = [dbg_tx])]
+    #[task(local = [dbg_tx], shared = [rx_buf])]
     fn print_dbg(cx: print_dbg::Context, msg: u8) {
-        cx.local.dbg_tx.write(msg);
+        let mut rx_buf = cx.shared.rx_buf;
+        let mut dbg_tx = cx.local.dbg_tx;
+
+        rx_buf.lock(|rx_buf| {
+            if msg == 0xFF {
+                dbg_tx.write(rx_buf.len() as u8);
+            }
+
+            // Print RX buffer
+            if msg == 0x10 {
+                for c in rx_buf {
+                    dbg_tx.write(*c);
+                };
+            }
+
+            //else {
+            //    dbg_tx.write(msg);
+            //}
+        });
+
     }
 }
