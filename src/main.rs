@@ -333,9 +333,9 @@ mod app {
             radio.set_freq_deviation(0x05);
             //radio.set_freq_offset(0x002);
             radio.set_trxdrtscale(true);
-            radio.set_data_rate(0x100);
+            radio.set_data_rate(0x40);
 
-            radio.set_auto_packet_handler(false);
+            radio.set_auto_packet_handler(true);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             // @ Data Rate == 0x01: 1 bit = 75 ms
@@ -343,10 +343,11 @@ mod app {
             //radio.set_data_rate(0xA);
 
             // Preamble
-            radio.set_tx_prealen(0x0);
+            radio.set_tx_prealen(0x00);
 
             // Sync Word
-            radio.set_tx_sync_len(0);
+            radio.set_sync_wrd(0xF0F0F0F0);
+            radio.set_tx_sync_len(0x80);
 
 
             // TX Header
