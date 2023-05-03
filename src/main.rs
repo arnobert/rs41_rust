@@ -148,7 +148,8 @@ mod app {
         // Disable JTAG ----------------------------------------------------------------------------
         let (mut pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
 
-        let mut gps_rstn = pa15.into_open_drain_output_with_state(&mut gpioa.crh, PinState::High);
+        // GPS disabled for the moment (PinState::High -> enables)
+        let mut gps_rstn = pa15.into_open_drain_output_with_state(&mut gpioa.crh, PinState::Low);
 
         // GPIO ------------------------------------------------------------------------------------
         let mut spst_1 = gpiob.pb6.into_floating_input(&mut gpiob.crl);
@@ -273,11 +274,11 @@ mod app {
 
     #[idle()]
     fn idle(cx: idle::Context) -> ! {
-        config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
+        //config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1100)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1200)).unwrap();
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-        query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
+        //query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -333,21 +334,19 @@ mod app {
             radio.set_freq_deviation(0x05);
             //radio.set_freq_offset(0x002);
             radio.set_trxdrtscale(true);
-            radio.set_data_rate(0x40);
+            radio.set_data_rate(0x80);
 
             radio.set_auto_packet_handler(true);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
-            // @ Data Rate == 0x01: 1 bit = 75 ms
-            // For Feld Hell we need 8.13 ms/pixel
-            //radio.set_data_rate(0xA);
-
             // Preamble
-            radio.set_tx_prealen(0x00);
+            radio.set_tx_prealen(0x0);
 
             // Sync Word
-            radio.set_sync_wrd(0xF0F0F0F0);
-            radio.set_tx_sync_len(0x80);
+            radio.set_sync_wrd(0xF0 << 24);
+
+            // 00 -> Sync Word 3
+            radio.set_tx_sync_len(0x00);
 
 
             // TX Header
@@ -355,11 +354,11 @@ mod app {
 
 
             // Packet Length
-            radio.set_packet_len(0);
-            radio.set_tx_fixplen(true);
+            //radio.set_packet_len(1);
+            radio.set_tx_fixplen(false);
 
             // CRC
-            radio.set_crc(false);
+            //radio.set_crc(false);
 
 
             radio.enter_tx();
@@ -392,8 +391,8 @@ mod app {
 
 
         // FSK
-        let sym_0: [u8; 8] = [position_X, 0, 0, 0, 0xDE, 0xAD, 0xBE, 0xEF];
-        //let sym_0: [u8; 2] = [0,0xFF];
+        //let sym_0: [u8; 4] = [0xFF, 0x00, 0xF0, 0x11];
+        let sym_0: [u8; 1] = [0xF1];
         //let sym= [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
 
         radio.write_fifo(&sym_0);
@@ -403,7 +402,7 @@ mod app {
             radio.tx_on();
         }
 
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
     }
 
 
