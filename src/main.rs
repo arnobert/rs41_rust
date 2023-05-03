@@ -334,19 +334,20 @@ mod app {
             radio.set_freq_deviation(0x05);
             //radio.set_freq_offset(0x002);
             radio.set_trxdrtscale(true);
-            radio.set_data_rate(0x80);
+            radio.set_data_rate(04180);
 
             radio.set_auto_packet_handler(true);
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             // Preamble
-            radio.set_tx_prealen(0x0);
+            radio.set_tx_prealen(0xF);
 
             // Sync Word
-            radio.set_sync_wrd(0xF0 << 24);
+            radio.set_sync_wrd(0xF0D0 << 16);
 
             // 00 -> Sync Word 3
-            radio.set_tx_sync_len(0x00);
+            // 01 -> Sync Word 3, 2
+            radio.set_tx_sync_len(0x01);
 
 
             // TX Header
@@ -354,7 +355,7 @@ mod app {
 
 
             // Packet Length
-            //radio.set_packet_len(1);
+            radio.set_packet_len(12);
             radio.set_tx_fixplen(false);
 
             // CRC
@@ -391,8 +392,8 @@ mod app {
 
 
         // FSK
-        //let sym_0: [u8; 4] = [0xFF, 0x00, 0xF0, 0x11];
-        let sym_0: [u8; 1] = [0xF1];
+        let sym_0: [u8; 12] = [0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF];
+        //let sym_0: [u8; 1] = [0xF1];
         //let sym= [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
 
         radio.write_fifo(&sym_0);
@@ -402,7 +403,7 @@ mod app {
             radio.tx_on();
         }
 
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
 
