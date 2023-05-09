@@ -229,7 +229,7 @@ blocks:
 - name: digital_correlate_access_code_tag_xx_0
   id: digital_correlate_access_code_tag_xx
   parameters:
-    access_code: '10101000110011000'
+    access_code: '1010100011011000'
     affinity: ''
     alias: ''
     comment: ''
