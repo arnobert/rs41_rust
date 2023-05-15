@@ -340,10 +340,11 @@ mod app {
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             // Preamble
-            radio.set_tx_prealen(0xF);
+            radio.set_tx_prealen(0x20);
 
             // Sync Word
-            radio.set_sync_wrd(0xF0D0 << 16);
+            // F8D8 = 10101000110011000
+            radio.set_sync_wrd(0xA8D8 << 16);
 
             // 00 -> Sync Word 3
             // 01 -> Sync Word 3, 2
@@ -355,7 +356,7 @@ mod app {
 
 
             // Packet Length
-            radio.set_packet_len(12);
+            radio.set_packet_len(24);
             radio.set_tx_fixplen(false);
 
             // CRC
@@ -392,9 +393,11 @@ mod app {
 
 
         // FSK
-        let sym_0: [u8; 12] = [0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF];
+        //let sym_0: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF];
+        //let sym_0: [u8; 8] = [0x01, 0x01, 0x01, 0x01, 0x0F, 0x0F, 0x0F, 0x0F];
+        //let sym_0: [u8; 8] = [0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA];
         //let sym_0: [u8; 1] = [0xF1];
-        //let sym= [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
+        let sym_0 = [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
 
         radio.write_fifo(&sym_0);
 
@@ -430,7 +433,7 @@ mod app {
 
     #[task(shared = [gps_tx, gps_rx])]
     fn query_pos(mut cx: query_pos::Context) {
-        let packet = UbxPacketRequest::request_for::<NavStatus>().into_packet_bytes();
+        let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
         cx.shared.gps_tx.bwrite_all(&packet);
         cx.shared.gps_tx.flush();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
