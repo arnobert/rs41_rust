@@ -4,10 +4,7 @@
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-//const CALLSIGN: [char; 1] = ['X'];
-//const CALLSIGN: [char; 6] = [' ', ' ', ' ', ' ', ' ', ' '];
-const CALLSIGN: [char; 4] = ['.', '.', '.', '.'];
-//const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
+const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
 
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
@@ -149,7 +146,7 @@ mod app {
         let (mut pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
 
         // GPS disabled for the moment (PinState::High -> enables)
-        let mut gps_rstn = pa15.into_open_drain_output_with_state(&mut gpioa.crh, PinState::Low);
+        let mut gps_rstn = pa15.into_open_drain_output_with_state(&mut gpioa.crh, PinState::High);
 
         // GPIO ------------------------------------------------------------------------------------
         let mut spst_1 = gpiob.pb6.into_floating_input(&mut gpiob.crl);
@@ -204,7 +201,6 @@ mod app {
         let mut gps_tx = gps_serial.tx;
         gps_tx.unlisten();
         let mut gps_rx = gps_serial.rx;
-        gps_rx.listen();
         //gps_rx.unlisten_idle();
 
         let mut rxbuf: Vec<u8, rx_buf_size> = Vec::new();
@@ -274,11 +270,15 @@ mod app {
 
     #[idle()]
     fn idle(cx: idle::Context) -> ! {
-        //config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(100)).unwrap();
-        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1100)).unwrap();
-        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1200)).unwrap();
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-        //query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
+        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
+        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(400)).unwrap();
+
+        config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
+        query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
+
+        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+
+
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -441,10 +441,12 @@ mod app {
 
         cx.shared.gps_tx.bwrite_all(&packet);
         cx.shared.gps_tx.flush();
+
+        cx.shared.gps_rx.listen();
     }
 
 
-    #[task(shared = [gps_tx, gps_rx])]
+    #[task(shared = [gps_tx])]
     fn query_pos(mut cx: query_pos::Context) {
         let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
         cx.shared.gps_tx.bwrite_all(&packet);
