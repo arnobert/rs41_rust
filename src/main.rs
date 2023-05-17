@@ -325,11 +325,24 @@ mod app {
             let fband = radio.get_freq_band();
             //radio.set_cw();
 
-            // Config for OOK ----------------------------------------------------------------------
-            //radio.set_modulation_type(si4032_driver::ModType::OOK);
+            // Config for HELL mode ----------------------------------------------------------------
+            #[cfg(feature = "hell")]
+            {
+                radio.set_modulation_type(si4032_driver::ModType::OOK);
+            }
 
-            // Config for FSK ----------------------------------------------------------------------
-            radio.set_modulation_type(si4032_driver::ModType::GFSK);
+            // Config for RTTY mode ----------------------------------------------------------------
+            #[cfg(feature = "rtty")]
+            {
+                radio.set_modulation_type(si4032_driver::ModType::FSK);
+            }
+
+            // Config for GFSK mode ----------------------------------------------------------------
+            #[cfg(not(any(feature = "rtty", feature = "hell")))]
+            {
+
+                radio.set_modulation_type(si4032_driver::ModType::GFSK);
+            }
             // Setting 0x01 gives around 1.1 kHz deviation
             radio.set_freq_deviation(0x05);
             //radio.set_freq_offset(0x002);
