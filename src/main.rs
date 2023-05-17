@@ -60,8 +60,10 @@ mod app {
         spi::*,
     };
     use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, rx_buf_size};
+
     #[cfg(feature = "hell")]
     use crate::hell;
+
     use ublox::*;
     use heapless::Vec;
     use si4032_driver::ETxPower;
@@ -276,7 +278,7 @@ mod app {
         config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
 
-        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
 
 
         loop {
@@ -323,12 +325,16 @@ mod app {
             radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
 
             let fband = radio.get_freq_band();
-            //radio.set_cw();
 
             // Config for HELL mode ----------------------------------------------------------------
             #[cfg(feature = "hell")]
             {
                 radio.set_modulation_type(si4032_driver::ModType::OOK);
+                radio.set_auto_packet_handler(false);
+                radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
+
+                // CRC
+                radio.set_crc(false);
             }
 
             // Config for RTTY mode ----------------------------------------------------------------
@@ -342,39 +348,37 @@ mod app {
             {
 
                 radio.set_modulation_type(si4032_driver::ModType::GFSK);
+                radio.set_freq_deviation(0x05);
+                //radio.set_freq_offset(0x002);
+                radio.set_trxdrtscale(true);
+                radio.set_data_rate(04180);
+
+                radio.set_auto_packet_handler(true);
+                radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
+
+                // Preamble
+                radio.set_tx_prealen(0x20);
+
+                // Sync Word
+                // F8D8 = 10101000110011000
+                radio.set_sync_wrd(0xA8D8 << 16);
+
+                // 00 -> Sync Word 3
+                // 01 -> Sync Word 3, 2
+                radio.set_tx_sync_len(0x01);
+
+
+                // TX Header
+                radio.set_tx_header_len(0);
+
+
+                // Packet Length
+                radio.set_packet_len(24);
+                radio.set_tx_fixplen(false);
+
+                // CRC
+                //radio.set_crc(false);
             }
-            // Setting 0x01 gives around 1.1 kHz deviation
-            radio.set_freq_deviation(0x05);
-            //radio.set_freq_offset(0x002);
-            radio.set_trxdrtscale(true);
-            radio.set_data_rate(04180);
-
-            radio.set_auto_packet_handler(true);
-            radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
-
-            // Preamble
-            radio.set_tx_prealen(0x20);
-
-            // Sync Word
-            // F8D8 = 10101000110011000
-            radio.set_sync_wrd(0xA8D8 << 16);
-
-            // 00 -> Sync Word 3
-            // 01 -> Sync Word 3, 2
-            radio.set_tx_sync_len(0x01);
-
-
-            // TX Header
-            radio.set_tx_header_len(0);
-
-
-            // Packet Length
-            radio.set_packet_len(24);
-            radio.set_tx_fixplen(false);
-
-            // CRC
-            //radio.set_crc(false);
-
 
             radio.enter_tx();
             *cx.local.radio_init = true;
@@ -406,10 +410,6 @@ mod app {
 
 
         // FSK
-        //let sym_0: [u8; 8] = [0xDE, 0xAD, 0xBE, 0xEF, 0xDE, 0xAD, 0xBE, 0xEF];
-        //let sym_0: [u8; 8] = [0x01, 0x01, 0x01, 0x01, 0x0F, 0x0F, 0x0F, 0x0F];
-        //let sym_0: [u8; 8] = [0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA];
-        //let sym_0: [u8; 1] = [0xF1];
         let sym_0 = [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
 
         radio.write_fifo(&sym_0);
