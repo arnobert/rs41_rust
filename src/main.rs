@@ -346,7 +346,6 @@ mod app {
             // Config for GFSK mode ----------------------------------------------------------------
             #[cfg(not(any(feature = "rtty", feature = "hell")))]
             {
-
                 radio.set_modulation_type(si4032_driver::ModType::GFSK);
                 radio.set_freq_deviation(0x05);
                 //radio.set_freq_offset(0x002);
@@ -388,32 +387,44 @@ mod app {
         // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
         // OOK / HELL
-        /*
-        for txchar in CALLSIGN {
-            let h_symbol: u128 = hell::get_char(txchar);
-            let h_bytes = h_symbol.to_be_bytes();
+        #[cfg(feature = "hell")]
+        {
+            for txchar in CALLSIGN {
+                let h_symbol: u128 = hell::get_char(txchar);
+                let h_bytes = h_symbol.to_be_bytes();
 
 
-            let mut txcnt: u8 = 0;
-            loop {
-                if txcnt == 13 {
-                    break;
+                let mut txcnt: u8 = 0;
+                loop {
+                    if txcnt == 13 {
+                        break;
+                    }
+
+                    let sym = [h_bytes[txcnt as usize]];
+                    radio.write_fifo(&sym);
+
+                    txcnt = txcnt + 1;
                 }
-
-                let sym = [h_bytes[txcnt as usize]];
-                radio.write_fifo(&sym);
-
-                txcnt = txcnt + 1;
             }
         }
-        */
+
+        // RTTY
+        #[cfg(feature = "rtty")]
+        {}
 
 
-        // FSK
-        let sym_0 = [b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F', b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F',b'D', b'E', b'A', b'D', b'B', b'E', b'E', b'F'];
+        // GFSK
+        #[cfg(not(any(feature = "rtty", feature = "hell")))]
+        {
+            let sym_0 = [b'D', b'E', b'A', b'D',
+                b'B', b'E', b'E', b'F',
+                b'D', b'E', b'A', b'D',
+                b'B', b'E', b'E', b'F',
+                b'D', b'E', b'A', b'D',
+                b'B', b'E', b'E', b'F'];
 
-        radio.write_fifo(&sym_0);
-
+            radio.write_fifo(&sym_0);
+        }
 
         if radio.is_tx_on() == false {
             radio.tx_on();
