@@ -4,7 +4,7 @@
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const CALLSIGN: [char; 6] = ['D', 'N', '1', 'L', 'A', 'B'];
+const CALLSIGN: [char; 7] = ['D', 'Q', '5', '0', 'R', 'U', 'B'];
 
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
@@ -22,6 +22,10 @@ const CAR_FREQ: u16 = 0xE9A7;
 
 const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
 const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
+
+const HELL_DATA_RATE: u16 = 0x252;
+const HELL_DELAY: u32 = 150000;
+const GFSK_DATA_RATE: u16 = 0x1054;
 // -------------------------------------------------------------------------------------------------
 
 const rx_buf_size: usize = 128;
@@ -59,7 +63,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, rx_buf_size};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, rx_buf_size, HELL_DATA_RATE, GFSK_DATA_RATE, HELL_DELAY};
 
     #[cfg(feature = "hell")]
     use crate::hell;
@@ -333,6 +337,8 @@ mod app {
                 radio.set_auto_packet_handler(false);
                 radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
+                radio.set_trxdrtscale(true);
+                radio.set_data_rate(HELL_DATA_RATE);
                 // CRC
                 radio.set_crc(false);
             }
@@ -350,7 +356,7 @@ mod app {
                 radio.set_freq_deviation(0x05);
                 //radio.set_freq_offset(0x002);
                 radio.set_trxdrtscale(true);
-                radio.set_data_rate(04180);
+                radio.set_data_rate(GFSK_DATA_RATE);
 
                 radio.set_auto_packet_handler(true);
                 radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
@@ -391,19 +397,22 @@ mod app {
         {
             for txchar in CALLSIGN {
                 let h_symbol: u128 = hell::get_char(txchar);
-                let h_bytes = h_symbol.to_be_bytes();
+                let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
 
-
-                let mut txcnt: u8 = 0;
-                loop {
-                    if txcnt == 13 {
-                        break;
-                    }
-
+                for txcnt in 0..16
+                {
                     let sym = [h_bytes[txcnt as usize]];
                     radio.write_fifo(&sym);
+                    radio.tx_on();
 
-                    txcnt = txcnt + 1;
+                    while !(radio.fifo_empty())
+                    {
+                        cortex_m::asm::nop();
+                    }
+                }
+
+                for _ in 0..HELL_DELAY {
+                    cortex_m::asm::nop();
                 }
             }
         }
@@ -426,11 +435,11 @@ mod app {
             radio.write_fifo(&sym_0);
         }
 
-        if radio.is_tx_on() == false {
-            radio.tx_on();
-        }
+        //if radio.is_tx_on() == false {
+        //    radio.tx_on();
+        //}
 
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
     }
 
 
