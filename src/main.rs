@@ -25,7 +25,8 @@ const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 
 const HELL_DATA_RATE: u16 = 0x252;
 const HELL_DELAY: u32 = 150000;
-const GFSK_DATA_RATE: u16 = 0x1054;
+// 1200 Baud = 0xB6D
+const GFSK_DATA_RATE: u16 = 0xB6D;
 // -------------------------------------------------------------------------------------------------
 
 const rx_buf_size: usize = 128;
@@ -433,12 +434,12 @@ mod app {
                 b'B', b'E', b'E', b'F'];
 
             radio.write_fifo(&sym_0);
+
+
+            if radio.is_tx_on() == false {
+                radio.tx_on();
+            }
         }
-
-        //if radio.is_tx_on() == false {
-        //    radio.tx_on();
-        //}
-
         tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
     }
 
