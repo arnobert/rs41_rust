@@ -79,6 +79,8 @@ mod app {
     //----------------------------------------------------------------------------------------------
     #[shared]
     struct Shared {
+        #[lock_free]
+        led_g: PB7<Output<PushPull>>,
         position: [u32; 3],
         #[lock_free]
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
@@ -90,7 +92,6 @@ mod app {
     #[local]
     struct Local {
         led_r: PB8<Output<PushPull>>,
-        led_g: PB7<Output<PushPull>>,
         timer_handler: CounterMs<pac::TIM1>,
 
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
@@ -225,7 +226,9 @@ mod app {
             &clocks,
         );
         let mut dbg_tx = dbg_serial.tx;
+
         let mut dbg_rx = dbg_serial.rx;
+        dbg_rx.listen();
 
         // ADC -------------------------------------------------------------------------------------
         let adc_ch0 = gpioa.pa5.into_analog(&mut gpioa.crl); // Battery voltage
@@ -247,13 +250,13 @@ mod app {
         (
             Shared {
                 position: [0, 0, 0],
+                led_g: ledg,
                 gps_tx,
                 gps_rx,
                 rx_buf: rxbuf,
             },
             Local {
                 led_r: ledr,
-                led_g: ledg,
                 timer_handler: timer,
                 radio_spi: radioSPI,
                 radio_init: false,
@@ -280,6 +283,7 @@ mod app {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(400)).unwrap();
 
+        toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
         config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
 
@@ -297,6 +301,12 @@ mod app {
     fn blink_led(cx: blink_led::Context) {
         cx.local.led_r.toggle();
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+    }
+
+
+    #[task(shared = [led_g])]
+    fn toggle_led_g(cx: toggle_led_g::Context) {
+        cx.shared.led_g.toggle();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -366,8 +376,8 @@ mod app {
                 radio.set_tx_prealen(0x20);
 
                 // Sync Word
-                // F8D8 = 10101000110011000
-                radio.set_sync_wrd(0xA8D8 << 16);
+                // F8D8 = 11100110 11011000
+                radio.set_sync_wrd(0xE6D8 << 16);
 
                 // 00 -> Sync Word 3
                 // 01 -> Sync Word 3, 2
@@ -536,8 +546,15 @@ mod app {
         *rxd1 = rxd;
     }
 
+    #[task(shared = [position, rx_buf] )]
+    fn parse_gps_pos(cx: parse_gps_pos::Context) {
+        let mut buf: Vec<u8, 256> = Vec::new();
+        let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
+        let mut parser = ublox::Parser::new(buf);
+    }
+
     // ADC measurements ----------------------------------------------------------------------------
-    #[task(local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle, led_g])]
+    #[task(shared = [led_g], local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
     fn read_adc(cx: read_adc::Context) {
         let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
         let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
@@ -548,7 +565,7 @@ mod app {
 
         if (vbat - pbut) < 100 {
             *cx.local.shutdown_next_cycle = true;
-            cx.local.led_g.set_high();
+            cx.shared.led_g.set_high();
         }
 
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
@@ -577,5 +594,26 @@ mod app {
             //    dbg_tx.write(msg);
             //}
         });
+    }
+
+    #[task(binds = USART3, local = [dbg_rx])]
+    fn read_dbg(cx: read_dbg::Context) {
+
+        let rx = cx.local.dbg_rx;
+        let rxb = rx.read();
+        match rxb {
+            Ok(T) => {
+                toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+            }
+            Err(E) => {
+                match E {
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {}
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {}
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {}
+                    nb::Error::Other(stm32f1xx_hal::serial::Error::Parity) => {}
+                    _ => {}
+                }
+            }
+        }
     }
 }
