@@ -606,6 +606,7 @@ mod app {
 
         rx_buf.lock(|rx_buf| {
             for msx in rx_buf {
+                while !dbg_tx.is_tx_empty() {};
                 _ = dbg_tx.write(*msx);
             }
         });
