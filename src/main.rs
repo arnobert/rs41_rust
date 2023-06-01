@@ -29,7 +29,7 @@ const HELL_DELAY: u32 = 150000;
 const GFSK_DATA_RATE: u16 = 0xB6D;
 // -------------------------------------------------------------------------------------------------
 
-const rx_buf_size: usize = 128;
+const RX_BUF_SIZE: usize = 128;
 
 
 #[cfg(feature = "hell")]
@@ -48,11 +48,7 @@ use panic_halt as _;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3, TIM4])]
 mod app {
-    use cortex_m::singleton;
-    use embedded_hal::adc::Channel;
-    //use rtt_target::{rprintln, rtt_init_print};
     use systick_monotonic::{fugit::Duration, Systick};
-    use nb::block;
     use stm32f1xx_hal::{
         adc::*,
         gpio::{gpioa::*, gpiob::*, gpioc::*,
@@ -64,7 +60,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, rx_buf_size, HELL_DATA_RATE, GFSK_DATA_RATE, HELL_DELAY};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, RX_BUF_SIZE, HELL_DATA_RATE, GFSK_DATA_RATE, HELL_DELAY};
 
     #[cfg(feature = "hell")]
     use crate::hell;
@@ -74,7 +70,6 @@ mod app {
     use si4032_driver::ETxPower;
     use stm32f1xx_hal::gpio::Analog;
     use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
-    use stm32f1xx_hal::serial::ReleaseToken;
     use stm32f1xx_hal::time::ms;
 
     //----------------------------------------------------------------------------------------------
@@ -87,7 +82,7 @@ mod app {
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         #[lock_free]
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
-        rx_buf: Vec<u8, rx_buf_size>,
+        rx_buf: Vec<u8, RX_BUF_SIZE>,
     }
 
     #[local]
@@ -122,13 +117,15 @@ mod app {
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        /*
         fn init_profile(device: &pac::Peripherals) {
             // On development, keep the DBG module powered on during wfi()
             device.DBGMCU.cr.modify(|_, w| w.dbg_standby().set_bit());
             device.DBGMCU.cr.modify(|_, w| w.dbg_sleep().set_bit());
             device.DBGMCU.cr.modify(|_, w| w.dbg_stop().set_bit());
         }
-        //init_profile(&cx.device);
+        init_profile(&cx.device);
+         */
 
         // Pend interrupts during init -------------------------------------------------------------
         rtic::pend(stm32f1xx_hal::pac::interrupt::TIM2);
@@ -150,7 +147,10 @@ mod app {
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
         let mut gpioc = cx.device.GPIOC.split();
+
+        /*
         let channels = cx.device.DMA1.split();
+        */
 
         // Disable JTAG ----------------------------------------------------------------------------
         let (mut pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
@@ -213,7 +213,7 @@ mod app {
         let mut gps_rx = gps_serial.rx;
         gps_rx.unlisten();
 
-        let mut rxbuf: Vec<u8, rx_buf_size> = Vec::new();
+        let mut rxbuf: Vec<u8, RX_BUF_SIZE> = Vec::new();
 
 
         // USART3 (Expansion header)----------------------------------------------------------------
@@ -239,7 +239,7 @@ mod app {
         let adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
 
 
-        let adc1_ch1 = gpioa.pa1.into_analog(&mut gpioa.crl); // Measurement out
+        let _adc1_ch1 = gpioa.pa1.into_analog(&mut gpioa.crl); // Measurement out
 
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
@@ -285,7 +285,7 @@ mod app {
 
 
     #[idle()]
-    fn idle(cx: idle::Context) -> ! {
+    fn idle(_cx: idle::Context) -> ! {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(400)).unwrap();
 
@@ -293,7 +293,7 @@ mod app {
         config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
 
-        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
 
 
         loop {
@@ -344,8 +344,6 @@ mod app {
 
 
             radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
-
-            let fband = radio.get_freq_band();
 
             // Config for HELL mode ----------------------------------------------------------------
             #[cfg(feature = "hell")]
@@ -476,8 +474,8 @@ mod app {
             reserved5: 0,
         }.into_packet_bytes();
 
-        cx.shared.gps_tx.bwrite_all(&packet);
-        cx.shared.gps_tx.flush();
+        _ = cx.shared.gps_tx.bwrite_all(&packet);
+        _ = cx.shared.gps_tx.flush();
 
         cx.shared.gps_rx.listen();
     }
@@ -486,8 +484,8 @@ mod app {
     #[task(shared = [gps_tx])]
     fn query_pos(mut cx: query_pos::Context) {
         let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
-        cx.shared.gps_tx.bwrite_all(&packet);
-        cx.shared.gps_tx.flush();
+        _ = cx.shared.gps_tx.bwrite_all(&packet);
+        _ = cx.shared.gps_tx.flush();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
     }
 
@@ -505,7 +503,7 @@ mod app {
 
 
         // Wait until next char is arrived
-        while !rx.is_rx_not_empty(){
+        while !rx.is_rx_not_empty() {
             cortex_m::asm::delay(5);
         }
 
@@ -516,16 +514,15 @@ mod app {
                 let rxd = T;
 
                 // Detecting magic word 0xB5 0x62
-                if ((*start_detect == false) && (*rxd1 == 0xB5) && (rxd == 0x62)) {
+                if (*start_detect == false) && (*rxd1 == 0xB5) && (rxd == 0x62) {
                     *start_detect = true;
                     rx_buf.lock(|rx_buf| {
                         rx_buf.clear();
-                        rx_buf.push(0xB5);
+                        _ = rx_buf.push(0xB5);
                         *msg_cnt = 1;
                         return;
                     });
-                }
-                else {
+                } else {
                     // *Shift register*
                     if *start_detect == false {
                         *rxd1 = rxd;
@@ -533,18 +530,18 @@ mod app {
                 }
 
                 // Writing into rx buffer
-                if (*start_detect == true) {
+                if *start_detect == true {
                     rx_buf.lock(|rx_buf| {
                         *msg_cnt = *msg_cnt + 1;
                         rx_buf.push(rxd).unwrap();
 
                         // Reading payload length
                         if *msg_cnt == 7 {
-                            *payload_len = ((rx_buf[5] as u16) << 8) + rx_buf[4] as u16 ;
+                            *payload_len = ((rx_buf[5] as u16) << 8) + rx_buf[4] as u16;
                         }
 
                         // Message complete
-                        if *msg_cnt >= (*payload_len + 8)  {
+                        if *msg_cnt >= (*payload_len + 8) {
                             *start_detect = false;
                             *msg_cnt = 0;
                             *payload_len = 0xFFF0;
@@ -552,7 +549,6 @@ mod app {
                             //parse_gps_data::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
                             print_dbg::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
                         }
-
                     });
                 }
             }
@@ -566,22 +562,20 @@ mod app {
                 }
             }
         }
-
     }
 
-    #[task(shared = [position, rx_buf] )]
+    #[task(shared = [position, rx_buf])]
     fn parse_gps_data(cx: parse_gps_data::Context) {
-
         let mut buf: Vec<u8, 256> = Vec::new();
         let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
         let mut parser = ublox::Parser::new(buf);
 
         let mut rx_buf = cx.shared.rx_buf;
-/*
-        rx_buf.lock(|rx_buf| {
-            rx_buf.clear();
-        });
-*/
+        /*
+                rx_buf.lock(|rx_buf| {
+                    rx_buf.clear();
+                });
+        */
         toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
     }
 
@@ -608,23 +602,21 @@ mod app {
     #[task(local = [dbg_tx], shared = [rx_buf])]
     fn print_dbg(cx: print_dbg::Context) {
         let mut rx_buf = cx.shared.rx_buf;
-        let mut dbg_tx = cx.local.dbg_tx;
+        let dbg_tx = cx.local.dbg_tx;
 
         rx_buf.lock(|rx_buf| {
             for msx in rx_buf {
-                dbg_tx.write(*msx);
+                _ = dbg_tx.write(*msx);
             }
         });
-
     }
-/*
+
     #[task(binds = USART3, local = [dbg_rx])]
     fn read_dbg(cx: read_dbg::Context) {
-
         let rx = cx.local.dbg_rx;
         let rxb = rx.read();
         match rxb {
-            Ok(T) => {
+            Ok(_T) => {
                 toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
             }
             Err(E) => {
@@ -637,5 +629,5 @@ mod app {
                 }
             }
         }
-    }*/
+    }
 }
