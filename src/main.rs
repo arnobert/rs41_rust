@@ -75,6 +75,7 @@ mod app {
     use stm32f1xx_hal::gpio::Analog;
     use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
     use stm32f1xx_hal::serial::ReleaseToken;
+    use stm32f1xx_hal::time::ms;
 
     //----------------------------------------------------------------------------------------------
     #[shared]
@@ -112,6 +113,8 @@ mod app {
         dbg_rx: stm32f1xx_hal::serial::Rx<USART3>,
         rxd_t1: u8,
         st_det: bool,
+        payload_len: u16,
+        msg_cnt: u16,
     }
 
     #[monotonic(binds = SysTick, default = true)]
@@ -129,7 +132,6 @@ mod app {
 
         // Pend interrupts during init -------------------------------------------------------------
         rtic::pend(stm32f1xx_hal::pac::interrupt::TIM2);
-        rtic::pend(stm32f1xx_hal::pac::interrupt::USART1);
 
         // Peripherals -----------------------------------------------------------------------------
         let mut flash = cx.device.FLASH.constrain();
@@ -209,7 +211,7 @@ mod app {
         let mut gps_tx = gps_serial.tx;
         gps_tx.unlisten();
         let mut gps_rx = gps_serial.rx;
-        //gps_rx.unlisten_idle();
+        gps_rx.unlisten();
 
         let mut rxbuf: Vec<u8, rx_buf_size> = Vec::new();
 
@@ -228,7 +230,7 @@ mod app {
         let mut dbg_tx = dbg_serial.tx;
 
         let mut dbg_rx = dbg_serial.rx;
-        dbg_rx.listen();
+        //dbg_rx.listen();
 
         // ADC -------------------------------------------------------------------------------------
         let adc_ch0 = gpioa.pa5.into_analog(&mut gpioa.crl); // Battery voltage
@@ -245,6 +247,8 @@ mod app {
         // State machine for UART receiver ---------------------------------------------------------
         let mut rxd1: u8 = 0;
         let mut stdet: bool = false;
+        let mut payloadlen: u16 = 0xFFF0;
+        let mut msg_cnt: u16 = 0;
 
         // End init --------------------------------------------------------------------------------
         (
@@ -272,6 +276,8 @@ mod app {
                 dbg_rx: dbg_rx,
                 rxd_t1: rxd1,
                 st_det: stdet,
+                payload_len: payloadlen,
+                msg_cnt: msg_cnt,
             },
             init::Monotonics(mono),
         )
@@ -283,11 +289,11 @@ mod app {
         blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(400)).unwrap();
 
-        toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
-        config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
+        //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+        config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
 
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
+        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
 
 
         loop {
@@ -486,15 +492,69 @@ mod app {
     }
 
 
-    // Receiving data from ublox. ------------------------------------------------------------------
-    #[task(binds = USART1, shared = [gps_rx])]
-    fn receive_gps_dx(mut cx: receive_gps_dx::Context) {
+    // Receiving data from ublox isr ---------------------------------------------------------------
+    #[task(binds = USART1, shared = [rx_buf, gps_rx], local = [rxd_t1, st_det, payload_len, msg_cnt])]
+    fn isr_gps(mut cx: isr_gps::Context) {
         let rx = cx.shared.gps_rx;
 
+        let mut rx_buf = cx.shared.rx_buf;
+        let mut rxd1 = cx.local.rxd_t1;
+        let mut start_detect = cx.local.st_det;
+        let mut payload_len = cx.local.payload_len;
+        let mut msg_cnt = cx.local.msg_cnt;
+
+
+        // Wait until next char is arrived
+        while !rx.is_rx_not_empty(){
+            cortex_m::asm::delay(5);
+        }
+
         let rxb = rx.read();
+
         match rxb {
             Ok(T) => {
-                process_gps_data::spawn(T).unwrap();
+                let rxd = T;
+
+                // Detecting magic word 0xB5 0x62
+                if ((*start_detect == false) && (*rxd1 == 0xB5) && (rxd == 0x62)) {
+                    *start_detect = true;
+                    rx_buf.lock(|rx_buf| {
+                        rx_buf.clear();
+                        rx_buf.push(0xB5);
+                        *msg_cnt = 1;
+                        return;
+                    });
+                }
+                else {
+                    // *Shift register*
+                    if *start_detect == false {
+                        *rxd1 = rxd;
+                    }
+                }
+
+                // Writing into rx buffer
+                if (*start_detect == true) {
+                    rx_buf.lock(|rx_buf| {
+                        *msg_cnt = *msg_cnt + 1;
+                        rx_buf.push(rxd).unwrap();
+
+                        // Reading payload length
+                        if *msg_cnt == 7 {
+                            *payload_len = ((rx_buf[5] as u16) << 8) + rx_buf[4] as u16 ;
+                        }
+
+                        // Message complete
+                        if *msg_cnt >= (*payload_len + 8)  {
+                            *start_detect = false;
+                            *msg_cnt = 0;
+                            *payload_len = 0xFFF0;
+                            toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+                            //parse_gps_data::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+                            print_dbg::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+                        }
+
+                    });
+                }
             }
             Err(E) => {
                 match E {
@@ -506,51 +566,23 @@ mod app {
                 }
             }
         }
-    }
 
-    #[task(shared = [rx_buf], local = [rxd_t1, st_det])]
-    fn process_gps_data(cx: process_gps_data::Context, rxd: u8) {
-        let mut rx_buf = cx.shared.rx_buf;
-        let mut rxd1 = cx.local.rxd_t1;
-        let mut start_detect = cx.local.st_det;
-        let mut msg_len: u8 = 0;
-
-        // Writing into rx buffer
-        if (*start_detect == true) {
-            rx_buf.lock(|rx_buf| {
-                rx_buf.push(rxd);
-
-                let bufp = rx_buf.len() as u8;
-                if bufp > 3 {
-                    msg_len = rx_buf[2];
-
-                    // Message complete
-                    if (bufp > (msg_len + 2)) {
-                        print_dbg::spawn(0x10);
-                        *start_detect = false;
-                    }
-                };
-            });
-        }
-
-        // Detecting magic word 0xB5 0x62
-        if ((!*start_detect) && (*rxd1 == 0xB5) && (rxd == 0x62)) {
-            *start_detect = true;
-
-            rx_buf.lock(|rx_buf| {
-                rx_buf.clear()
-            });
-        }
-
-        // *Shift register*
-        *rxd1 = rxd;
     }
 
     #[task(shared = [position, rx_buf] )]
-    fn parse_gps_pos(cx: parse_gps_pos::Context) {
+    fn parse_gps_data(cx: parse_gps_data::Context) {
+
         let mut buf: Vec<u8, 256> = Vec::new();
         let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
         let mut parser = ublox::Parser::new(buf);
+
+        let mut rx_buf = cx.shared.rx_buf;
+/*
+        rx_buf.lock(|rx_buf| {
+            rx_buf.clear();
+        });
+*/
+        toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
     }
 
     // ADC measurements ----------------------------------------------------------------------------
@@ -574,28 +606,18 @@ mod app {
 
     // Debug UART ----------------------------------------------------------------------------------
     #[task(local = [dbg_tx], shared = [rx_buf])]
-    fn print_dbg(cx: print_dbg::Context, msg: u8) {
+    fn print_dbg(cx: print_dbg::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut dbg_tx = cx.local.dbg_tx;
 
         rx_buf.lock(|rx_buf| {
-            if msg == 0xFF {
-                dbg_tx.write(rx_buf.len() as u8);
+            for msx in rx_buf {
+                dbg_tx.write(*msx);
             }
-
-            // Print RX buffer
-            if msg == 0x10 {
-                for c in rx_buf.iter() {
-                    dbg_tx.write(*c);
-                };
-            }
-
-            //else {
-            //    dbg_tx.write(msg);
-            //}
         });
-    }
 
+    }
+/*
     #[task(binds = USART3, local = [dbg_rx])]
     fn read_dbg(cx: read_dbg::Context) {
 
@@ -615,5 +637,5 @@ mod app {
                 }
             }
         }
-    }
+    }*/
 }
