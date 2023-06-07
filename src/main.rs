@@ -337,7 +337,6 @@ mod app {
         });
 
 
-
         // Init Radio ------------------------------------------------------------------------------
         if *cx.local.radio_init == false {
             radio.swreset();
@@ -586,10 +585,7 @@ mod app {
             loop {
                 match rxdt.next() {
                     Some(Ok(packet)) => {
-
-
                         match packet {
-
                             PacketRef::NavPosLlh(pack) => {
                                 position.lock(|position| {
                                     position[0] = pack.lat_degrees();
@@ -598,10 +594,8 @@ mod app {
                                 });
                             }
 
-                             _ => {},
-
+                            _ => {}
                         };
-
                     }
                     Some(Err(_)) => {
                         // Received a malformed packet, ignore it
@@ -612,7 +606,6 @@ mod app {
                     }
                 }
             }
-
         });
         toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
     }
