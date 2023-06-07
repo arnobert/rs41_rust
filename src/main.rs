@@ -48,6 +48,7 @@ use panic_halt as _;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3, TIM4])]
 mod app {
+    use core::mem::size_of;
     use systick_monotonic::{fugit::Duration, Systick};
     use stm32f1xx_hal::{
         adc::*,
@@ -77,7 +78,7 @@ mod app {
     struct Shared {
         #[lock_free]
         led_g: PB7<Output<PushPull>>,
-        position: [u32; 3],
+        position: [f64; 3],
         #[lock_free]
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         #[lock_free]
@@ -253,7 +254,7 @@ mod app {
         // End init --------------------------------------------------------------------------------
         (
             Shared {
-                position: [0, 0, 0],
+                position: [0.0, 0.0, 0.0],
                 led_g: ledg,
                 gps_tx,
                 gps_rx,
@@ -293,7 +294,7 @@ mod app {
         config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
 
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
+        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
 
 
         loop {
@@ -325,11 +326,16 @@ mod app {
 
         // Getting position data
         let mut position = cx.shared.position;
-        let mut position_X: u8 = 0;
+        let mut position_len: f64 = 0.0;
+        let mut position_long: f64 = 0.0;
+        let mut position_height: f64 = 0.0;
 
         position.lock(|position| {
-            position_X = position[0] as u8;
+            position_len = position[0];
+            position_long = position[1];
+            position_height = position[2];
         });
+
 
 
         // Init Radio ------------------------------------------------------------------------------
@@ -545,9 +551,7 @@ mod app {
                             *start_detect = false;
                             *msg_cnt = 0;
                             *payload_len = 0xFFF0;
-                            toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
-                            //parse_gps_data::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
-                            print_dbg::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+                            parse_gps_data::spawn().unwrap();
                         }
                     });
                 }
@@ -566,16 +570,50 @@ mod app {
 
     #[task(shared = [position, rx_buf])]
     fn parse_gps_data(cx: parse_gps_data::Context) {
-        let mut buf: Vec<u8, 256> = Vec::new();
-        let buf = ublox::FixedLinearBuffer::new(&mut buf[..]);
-        let mut parser = ublox::Parser::new(buf);
-
         let mut rx_buf = cx.shared.rx_buf;
-        /*
-                rx_buf.lock(|rx_buf| {
-                    rx_buf.clear();
-                });
-        */
+        let mut position = cx.shared.position;
+
+
+        // Local buffer
+        let mut pbuf: Vec<u8, RX_BUF_SIZE> = Vec::new();
+
+        rx_buf.lock(|rx_buf| {
+            let ubxbuf = ublox::FixedLinearBuffer::new(&mut pbuf);
+            let mut parser = ublox::Parser::new(ubxbuf);
+
+            let mut rxdt = parser.consume(&rx_buf);
+
+            loop {
+                match rxdt.next() {
+                    Some(Ok(packet)) => {
+
+
+                        match packet {
+
+                            PacketRef::NavPosLlh(pack) => {
+                                position.lock(|position| {
+                                    position[0] = pack.lat_degrees();
+                                    position[1] = pack.lon_degrees();
+                                    position[2] = pack.height_msl();
+                                });
+                            }
+
+                             _ => {},
+
+                        };
+
+                    }
+                    Some(Err(_)) => {
+                        // Received a malformed packet, ignore it
+                    }
+                    None => {
+                        // We've eaten all the packets we have
+                        break;
+                    }
+                }
+            }
+
+        });
         toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
     }
 
