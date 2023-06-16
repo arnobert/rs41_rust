@@ -48,7 +48,6 @@ use panic_halt as _;
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3, TIM4])]
 mod app {
-    use core::mem::size_of;
     use systick_monotonic::{fugit::Duration, Systick};
     use stm32f1xx_hal::{
         adc::*,
@@ -73,6 +72,7 @@ mod app {
     use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
     use stm32f1xx_hal::time::ms;
 
+    use lexical_core::BUFFER_SIZE;
     //----------------------------------------------------------------------------------------------
     #[shared]
     struct Shared {
@@ -294,7 +294,7 @@ mod app {
         config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
 
-        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
 
 
         loop {
@@ -326,16 +326,16 @@ mod app {
 
         // Getting position data
         let mut position = cx.shared.position;
-        let mut position_len: f64 = 0.0;
-        let mut position_long: f64 = 0.0;
-        let mut position_height: f64 = 0.0;
+
+        let mut position_len  = [b'0'; BUFFER_SIZE];
+        let mut position_long  = [b'0'; BUFFER_SIZE];
+        let mut position_height  = [b'0'; BUFFER_SIZE];
 
         position.lock(|position| {
-            position_len = position[0];
-            position_long = position[1];
-            position_height = position[2];
+            let c_cnt_len = lexical_core::write(position[0], &mut position_len);
+            let c_cnt_long = lexical_core::write(position[1], &mut position_long);
+            let c_position_height = lexical_core::write(position[2], &mut position_height);
         });
-
 
         // Init Radio ------------------------------------------------------------------------------
         if *cx.local.radio_init == false {

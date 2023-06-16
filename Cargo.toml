@@ -26,3 +26,10 @@ version = "0.10.0"
 [profile.dev]
 opt-level = "s"
 [profile.release]
+
+
+[dependencies.lexical-core]
+version = "0.8.5"
+default-features = false
+# Can select only desired parsing/writing features.
+features = ["parse-floats", "write-floats", "write-integers"]
