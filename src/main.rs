@@ -72,6 +72,7 @@ mod app {
     use stm32f1xx_hal::time::ms;
 
     use lexical_core::BUFFER_SIZE;
+
     //----------------------------------------------------------------------------------------------
     #[shared]
     struct Shared {
@@ -326,9 +327,9 @@ mod app {
         // Getting position data
         let mut position = cx.shared.position;
 
-        let mut position_len  = [b'0'; BUFFER_SIZE];
-        let mut position_long  = [b'0'; BUFFER_SIZE];
-        let mut position_height  = [b'0'; BUFFER_SIZE];
+        let mut position_len = [b'0'; BUFFER_SIZE];
+        let mut position_long = [b'0'; BUFFER_SIZE];
+        let mut position_height = [b'0'; BUFFER_SIZE];
 
         position.lock(|position| {
             let c_cnt_len = lexical_core::write(position[0], &mut position_len);
@@ -440,7 +441,7 @@ mod app {
             radio.write_fifo(sym_0);
 
 
-            if radio.is_tx_on() == false {
+            if !radio.is_tx_on() {
                 radio.tx_on();
             }
         }
