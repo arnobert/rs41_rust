@@ -1,6 +1,12 @@
 #![no_std]
 #![no_main]
 
+#[cfg(feature = "hell")]
+mod hell;
+
+use embedded_hal::spi::{Mode, Phase, Polarity};
+use panic_halt as _;
+
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
@@ -9,42 +15,35 @@ const CALLSIGN: [char; 7] = ['D', 'Q', '5', '0', 'R', 'U', 'B'];
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
 
-
+// TX power
 const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
-// -------------------------------------------------------------------------------------------------
-
 
 // Frequency, as calculated by Python script
 const HBSEL: bool = true;
 const FREQBAND: u8 = 0x00;
 const CAR_FREQ: u16 = 0xE9A7;
 
-
+// -------------------------------------------------------------------------------------------------
 const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
 const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 
+// Hell mode parameters
 const HELL_DATA_RATE: u16 = 0x252;
 const HELL_DELAY: u32 = 150000;
-// 1200 Baud = 0xB6D
+
+// GFSK mode parameters.
+// 1200 Baud => 0xB6D
 const GFSK_DATA_RATE: u16 = 0xB6D;
 // -------------------------------------------------------------------------------------------------
 
 const RX_BUF_SIZE: usize = 128;
-
-
-#[cfg(feature = "hell")]
-mod hell;
-
-use embedded_hal::spi::{Mode, Phase, Polarity};
 
 pub const SPIMODE: Mode = Mode {
     phase: Phase::CaptureOnSecondTransition,
     polarity: Polarity::IdleHigh,
 };
 
-#[allow(unused_imports)]
-use cortex_m_rt::entry;
-use panic_halt as _;
+// -------------------------------------------------------------------------------------------------
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3, TIM4])]
 mod app {
