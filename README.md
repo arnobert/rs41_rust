@@ -20,7 +20,6 @@ Please read his documentation: https://github.com/bazjo/radiosonde_hardware/tree
 For a planned HAB launch the sonde has following requirements:
 - Transmit **location** (coordinates and altitude)
 - **Modulation**: GFSK and Hellschreiber mode
-- RTTY optional (is going to be tricky with the Si4032)
 - Reading environmental (temperature, pressure) sensor optional
 - Additional UART port at external connector
 
@@ -38,9 +37,9 @@ For a planned HAB launch the sonde has following requirements:
 - Hellschreiber mode (needs fine tuning)
 - Generating ubx messages
 - Sending ubx messages to u-blox GPS receiver
+- Parsing ubx messages from u-blox
 
 ### Next steps:
-- Parsing ubx messages from u-blox
 - Improving GFSK receiver (GNU Radio)
 
 ## Building
@@ -55,14 +54,10 @@ With Hellschreiber mode:
 ```
 $ cargo build --features "hell"
 ```
-With RTTY mode:
-```
-$ cargo build --features "rtty"
-```
-Flashing the sonde, GFSK/HELL/RTTY:
+
+Flashing the sonde, GFSK/HELL:
 ```
 $ cargo embed
 $ cargo embed --features "hell"
-$ cargo embed --features "rtty"
 ```
 Cargo embed auto-detects the LPC Link.
