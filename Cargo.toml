@@ -17,7 +17,6 @@ nb = "1.1.0"
 
 [features]
 hell = []
-rtty = []
 
 [dependencies.stm32f1xx-hal]
 features = ["stm32f100", "rt", "medium"]

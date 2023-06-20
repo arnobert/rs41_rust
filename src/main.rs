@@ -362,14 +362,9 @@ mod app {
                 radio.set_crc(false);
             }
 
-            // Config for RTTY mode ----------------------------------------------------------------
-            #[cfg(feature = "rtty")]
-            {
-                radio.set_modulation_type(si4032_driver::ModType::FSK);
-            }
 
             // Config for GFSK mode ----------------------------------------------------------------
-            #[cfg(not(any(feature = "rtty", feature = "hell")))]
+            #[cfg(not(any(feature = "hell")))]
             {
                 radio.set_modulation_type(si4032_driver::ModType::GFSK);
                 radio.set_freq_deviation(0x05);
@@ -436,13 +431,9 @@ mod app {
             }
         }
 
-        // RTTY
-        #[cfg(feature = "rtty")]
-        {}
-
 
         // GFSK
-        #[cfg(not(any(feature = "rtty", feature = "hell")))]
+        #[cfg(not(any(feature = "hell")))]
         {
             let sym_0 = [b'D', b'E', b'A', b'D',
                 b'B', b'E', b'E', b'F',
