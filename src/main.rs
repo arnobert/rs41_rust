@@ -501,8 +501,8 @@ mod app {
         let rxb = rx.read();
 
         match rxb {
-            Ok(T) => {
-                let rxd = T;
+            Ok(t) => {
+                let rxd = t;
 
                 // Detecting magic word 0xB5 0x62
                 if (*start_detect == false) && (*rxd1 == 0xB5) && (rxd == 0x62) {
@@ -541,8 +541,8 @@ mod app {
                     });
                 }
             }
-            Err(E) => {
-                match E {
+            Err(e) => {
+                match e {
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {}
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {}
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {}
@@ -634,11 +634,11 @@ mod app {
         let rx = cx.local.dbg_rx;
         let rxb = rx.read();
         match rxb {
-            Ok(_T) => {
+            Ok(_t) => {
                 toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
             }
-            Err(E) => {
-                match E {
+            Err(e) => {
+                match e {
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {}
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {}
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Noise) => {}
