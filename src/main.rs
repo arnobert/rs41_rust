@@ -435,14 +435,9 @@ mod app {
         // GFSK
         #[cfg(not(any(feature = "hell")))]
         {
-            let sym_0 = [b'D', b'E', b'A', b'D',
-                b'B', b'E', b'E', b'F',
-                b'D', b'E', b'A', b'D',
-                b'B', b'E', b'E', b'F',
-                b'D', b'E', b'A', b'D',
-                b'B', b'E', b'E', b'F'];
+            let sym_0 = b"DEADBEEF";
 
-            radio.write_fifo(&sym_0);
+            radio.write_fifo(sym_0);
 
 
             if radio.is_tx_on() == false {
