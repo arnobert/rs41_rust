@@ -335,11 +335,27 @@ mod app {
         let mut position_long = [b'0'; BUFFER_SIZE];
         let mut position_height = [b'0'; BUFFER_SIZE];
 
+
+        let mut c_len: [char; BUFFER_SIZE] = ['.'; BUFFER_SIZE];
+        let mut c_long: [char; BUFFER_SIZE] = ['.'; BUFFER_SIZE];
+        let mut c_height: [char; BUFFER_SIZE] = ['.'; BUFFER_SIZE];
+
         position.lock(|position| {
             let c_cnt_len = lexical_core::write(position[0], &mut position_len);
             let c_cnt_long = lexical_core::write(position[1], &mut position_long);
             let c_position_height = lexical_core::write(position[2], &mut position_height);
+
+
+            for c in 0..BUFFER_SIZE {
+                c_len[c] = char::from(position_len[c]);
+                c_long[c] = char::from(position_long[c]);
+                c_height[c] = char::from(position_height[c]);
+            }
         });
+
+
+
+
 
         // Init Radio ------------------------------------------------------------------------------
         if !*cx.local.radio_init {
@@ -415,39 +431,44 @@ mod app {
         #[cfg(feature = "hell")]
         {
 
-        fn tx_hell(txdt: &[char], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
-                                    stm32f1xx_hal::spi::Spi2NoRemap,
-                                    (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
-                                    PC13<Output<PushPull>>>)
-        {
+            fn tx_hell(txdt: &[char], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
+                                        stm32f1xx_hal::spi::Spi2NoRemap,
+                                        (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
+                                        PC13<Output<PushPull>>>)
+            {
 
-            for txchar in txdt {
-                let h_symbol: u128 = hell::get_char(*txchar);
-                let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
+                for txchar in txdt {
+                    let h_symbol: u128 = hell::get_char(*txchar);
+                    let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
 
-                for txcnt in 0..16
-                {
-                    let sym = [h_bytes[txcnt as usize]];
-                    tradio.write_fifo(&sym);
-                    tradio.tx_on();
-
-                    while !(tradio.fifo_empty())
+                    for txcnt in 0..16
                     {
+                        let sym = [h_bytes[txcnt as usize]];
+                        tradio.write_fifo(&sym);
+                        tradio.tx_on();
+
+                        while !(tradio.fifo_empty())
+                        {
+                            cortex_m::asm::nop();
+                        }
+                    }
+
+                    for _ in 0..HELL_DELAY {
                         cortex_m::asm::nop();
                     }
                 }
-
-                for _ in 0..HELL_DELAY {
-                    cortex_m::asm::nop();
-                }
             }
-        }
 
-        tx_hell(&CALLSIGN, radio);
-        tx_hell(&COORD_HEIGHT, radio);
-        tx_hell(&COORD_LEN, radio);
-        tx_hell(&COORD_LONG, radio);
+            tx_hell(&CALLSIGN, radio);
 
+            tx_hell(&COORD_HEIGHT, radio);
+            tx_hell(&c_height, radio);
+
+            tx_hell(&COORD_LEN, radio);
+            tx_hell(&c_len, radio);
+
+            tx_hell(&COORD_LONG, radio);
+            tx_hell(&c_long, radio);
 
         }
 
