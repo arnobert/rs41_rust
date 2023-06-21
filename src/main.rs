@@ -298,7 +298,7 @@ mod app {
         config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap();
         query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
 
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
+        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
 
 
         loop {
@@ -489,7 +489,7 @@ mod app {
                 radio.tx_on();
             }
         }
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
+        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(30000)).unwrap();
     }
 
 
@@ -637,7 +637,8 @@ mod app {
                 }
             }
         });
-        toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+        //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
     }
 
     // ADC measurements ----------------------------------------------------------------------------
