@@ -336,9 +336,9 @@ mod app {
         let mut position_height = [b'0'; BUFFER_SIZE];
 
 
-        let mut c_len: [char; BUFFER_SIZE] = ['.'; BUFFER_SIZE];
-        let mut c_long: [char; BUFFER_SIZE] = ['.'; BUFFER_SIZE];
-        let mut c_height: [char; BUFFER_SIZE] = ['.'; BUFFER_SIZE];
+        let mut c_len: [char; 16] = ['.'; 16];
+        let mut c_long: [char; 16] = ['.'; 16];
+        let mut c_height: [char; 8] = ['.'; 8];
 
         position.lock(|position| {
             let c_cnt_len = lexical_core::write(position[0], &mut position_len);
@@ -346,9 +346,13 @@ mod app {
             let c_position_height = lexical_core::write(position[2], &mut position_height);
 
 
-            for c in 0..BUFFER_SIZE {
+            for c in 0..15 {
                 c_len[c] = char::from(position_len[c]);
+            }
+            for c in 0..15{
                 c_long[c] = char::from(position_long[c]);
+            }
+            for c in 0..7{
                 c_height[c] = char::from(position_height[c]);
             }
         });
