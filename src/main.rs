@@ -10,7 +10,7 @@ use panic_halt as _;
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const CALLSIGN: [char; 7] = ['D', 'Q', '5', '0', 'R', 'U', 'B'];
+const CALLSIGN: [char; 11] = ['D', 'Q', '5', '0', 'R', 'U', 'B', ' ', 'W', 'X', ' '];
 
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
@@ -36,6 +36,10 @@ const HELL_DELAY: u32 = 150000;
 const GFSK_DATA_RATE: u16 = 0xB6D;
 // -------------------------------------------------------------------------------------------------
 
+const COORD_HEIGHT: [char; 7] = ['H', 'E', 'I', 'G', 'H', 'T', ' '];
+const COORD_LEN: [char; 4] = ['L', 'E', 'N', ' '];
+const COORD_LONG: [char; 5] = ['L', 'O', 'N', 'G', ' '];
+
 const RX_BUF_SIZE: usize = 128;
 
 pub const SPIMODE: Mode = Mode {
@@ -59,7 +63,7 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, RX_BUF_SIZE, HELL_DATA_RATE, GFSK_DATA_RATE, HELL_DELAY};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, RX_BUF_SIZE, HELL_DATA_RATE, GFSK_DATA_RATE, HELL_DELAY, COORD_HEIGHT, COORD_LEN, COORD_LONG};
 
     #[cfg(feature = "hell")]
     use crate::hell;
@@ -410,17 +414,24 @@ mod app {
         // OOK / HELL
         #[cfg(feature = "hell")]
         {
-            for txchar in CALLSIGN {
-                let h_symbol: u128 = hell::get_char(txchar);
+
+        fn tx_hell(txdt: &[char], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
+                                    stm32f1xx_hal::spi::Spi2NoRemap,
+                                    (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
+                                    PC13<Output<PushPull>>>)
+        {
+
+            for txchar in txdt {
+                let h_symbol: u128 = hell::get_char(*txchar);
                 let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
 
                 for txcnt in 0..16
                 {
                     let sym = [h_bytes[txcnt as usize]];
-                    radio.write_fifo(&sym);
-                    radio.tx_on();
+                    tradio.write_fifo(&sym);
+                    tradio.tx_on();
 
-                    while !(radio.fifo_empty())
+                    while !(tradio.fifo_empty())
                     {
                         cortex_m::asm::nop();
                     }
@@ -430,6 +441,14 @@ mod app {
                     cortex_m::asm::nop();
                 }
             }
+        }
+
+        tx_hell(&CALLSIGN, radio);
+        tx_hell(&COORD_HEIGHT, radio);
+        tx_hell(&COORD_LEN, radio);
+        tx_hell(&COORD_LONG, radio);
+
+
         }
 
 
