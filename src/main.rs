@@ -338,7 +338,7 @@ mod app {
         });
 
         // Init Radio ------------------------------------------------------------------------------
-        if *cx.local.radio_init == false {
+        if !*cx.local.radio_init {
             radio.swreset();
             while !(radio.chip_ready()) {};
 
@@ -505,7 +505,7 @@ mod app {
                 let rxd = t;
 
                 // Detecting magic word 0xB5 0x62
-                if (*start_detect == false) && (*rxd1 == 0xB5) && (rxd == 0x62) {
+                if (!*start_detect) && (*rxd1 == 0xB5) && (rxd == 0x62) {
                     *start_detect = true;
                     rx_buf.lock(|rx_buf| {
                         rx_buf.clear();
@@ -515,13 +515,13 @@ mod app {
                     });
                 } else {
                     // *Shift register*
-                    if *start_detect == false {
+                    if !*start_detect {
                         *rxd1 = rxd;
                     }
                 }
 
                 // Writing into rx buffer
-                if *start_detect == true {
+                if *start_detect {
                     rx_buf.lock(|rx_buf| {
                         *msg_cnt = *msg_cnt + 1;
                         rx_buf.push(rxd).unwrap();
