@@ -28,6 +28,9 @@ const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
 const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 
 // Hell mode parameters
+// Set data rate to:
+// 0x254 for Feld Hell
+// TBD: Slow Hell, Hell x5 ...
 const HELL_DATA_RATE: u16 = 0x252;
 const HELL_DELAY: u32 = 150000;
 
