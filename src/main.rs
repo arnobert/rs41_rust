@@ -79,6 +79,7 @@ mod app {
     use stm32f1xx_hal::time::ms;
 
     use lexical_core::BUFFER_SIZE;
+    use ublox::PacketRef::CfgNav5;
 
     //----------------------------------------------------------------------------------------------
     #[shared]
@@ -515,6 +516,31 @@ mod app {
         _ = cx.shared.gps_tx.bwrite_all(&packet);
         _ = cx.shared.gps_tx.flush();
 
+        // Set Dynamic model: Airborne <2g
+        let model_packet = CfgNav5Builder {
+            mask: CfgNav5Params::DYN,
+            dyn_model: CfgNav5DynModel::AirborneWith4gAcceleration,
+            fix_mode: CfgNav5FixMode::default(),
+            fixed_alt: 0.0,
+            fixed_alt_var: 0.0,
+            min_elev_degrees: 0,
+            dr_limit: 0,
+            pdop: 0.0,
+            tdop: 0.0,
+            pacc: 0,
+            tacc: 0,
+            static_hold_thresh: 0.0,
+            dgps_time_out: 0,
+            cno_thresh_num_svs: 0,
+            cno_thresh: 0,
+            reserved1: [0; 2],
+            static_hold_max_dist: 0,
+            utc_standard: CfgNav5UtcStandard::default(),
+            reserved2: [0; 5],
+
+        }.into_packet_bytes();
+
+        _ = cx.shared.gps_tx.bwrite_all(&model_packet);
         cx.shared.gps_rx.listen();
     }
 
