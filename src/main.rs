@@ -31,8 +31,13 @@ const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
 // Set data rate to:
 // 0x254 for Feld Hell
 // TBD: Slow Hell, Hell x5 ...
+
+#[cfg(feature = "hell")]
 const HELL_DATA_RATE: u16 = 0x252;
+
+#[cfg(feature = "hell")]
 const HELL_DELAY: u32 = 150000;
+
 
 // GFSK mode parameters.
 // 1200 Baud => 0xB6D
@@ -66,7 +71,11 @@ mod app {
         serial::{Config, Serial},
         spi::*,
     };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, RX_BUF_SIZE, HELL_DATA_RATE, GFSK_DATA_RATE, HELL_DELAY, COORD_HEIGHT, COORD_LEN, COORD_LONG};
+    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, RX_BUF_SIZE, GFSK_DATA_RATE, COORD_HEIGHT, COORD_LEN, COORD_LONG};
+
+
+    #[cfg(feature = "hell")]
+    use crate::{HELL_DATA_RATE, HELL_DELAY};
 
     #[cfg(feature = "hell")]
     use crate::hell;
@@ -76,10 +85,8 @@ mod app {
     use si4032_driver::ETxPower;
     use stm32f1xx_hal::gpio::Analog;
     use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
-    use stm32f1xx_hal::time::ms;
 
     use lexical_core::BUFFER_SIZE;
-    use ublox::PacketRef::CfgNav5;
 
     //----------------------------------------------------------------------------------------------
     #[shared]
@@ -353,16 +360,13 @@ mod app {
             for c in 0..15 {
                 c_len[c] = char::from(position_len[c]);
             }
-            for c in 0..15{
+            for c in 0..15 {
                 c_long[c] = char::from(position_long[c]);
             }
-            for c in 0..7{
+            for c in 0..7 {
                 c_height[c] = char::from(position_height[c]);
             }
         });
-
-
-
 
 
         // Init Radio ------------------------------------------------------------------------------
@@ -438,13 +442,11 @@ mod app {
         // OOK / HELL
         #[cfg(feature = "hell")]
         {
-
             fn tx_hell(txdt: &[char], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
-                                        stm32f1xx_hal::spi::Spi2NoRemap,
-                                        (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
-                                        PC13<Output<PushPull>>>)
+                stm32f1xx_hal::spi::Spi2NoRemap,
+                (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
+                PC13<Output<PushPull>>>)
             {
-
                 for txchar in txdt {
                     let h_symbol: u128 = hell::get_char(*txchar);
                     let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
@@ -477,7 +479,6 @@ mod app {
 
             tx_hell(&COORD_LONG, radio);
             tx_hell(&c_long, radio);
-
         }
 
 
