@@ -42,6 +42,20 @@ For a planned HAB launch the sonde has following requirements:
 ### Next steps:
 - Improving GFSK receiver (GNU Radio)
 
+## Unlocking the flash
+
+### First terminal: open openocd
+```
+openocd -f interface/cmsis-dap.cfg -c "transport select swd"  -f target/stm32f1x.cfg
+```
+
+### Second terminal: commands to openocd and unlock
+```
+telnet 127.0.0.1 4444
+
+> flash protect 0 0 15 off
+```
+
 ## Building
 
 ```
