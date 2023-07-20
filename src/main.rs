@@ -7,6 +7,27 @@ mod hell;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 use panic_halt as _;
 
+use systick_monotonic::{fugit::Duration, Systick};
+use stm32f1xx_hal::{
+    adc::*,
+    gpio::{gpioa::*, gpiob::*, gpioc::*,
+           Input, Alternate, Floating,
+           Output, PinState, PushPull},
+    pac,
+    prelude::*,
+    timer::{CounterMs, Event},
+    serial::{Config, Serial},
+    spi::*,
+};
+
+use ublox::*;
+use heapless::Vec;
+use si4032_driver::ETxPower;
+use stm32f1xx_hal::gpio::Analog;
+use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
+
+use lexical_core::BUFFER_SIZE;
+
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
@@ -59,36 +80,8 @@ pub const SPIMODE: Mode = Mode {
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3, TIM4])]
 mod app {
-    use systick_monotonic::{fugit::Duration, Systick};
-    use stm32f1xx_hal::{
-        adc::*,
-        gpio::{gpioa::*, gpiob::*, gpioc::*,
-               Input, Alternate, Floating,
-               Output, PinState, PushPull},
-        pac,
-        prelude::*,
-        timer::{CounterMs, Event},
-        serial::{Config, Serial},
-        spi::*,
-    };
-    use crate::{F_C_UPPER, F_C_LOWER, SPIMODE, TX_POWER, FREQBAND, HBSEL, CALLSIGN, RX_BUF_SIZE, GFSK_DATA_RATE, COORD_HEIGHT, COORD_LEN, COORD_LONG};
+    use super::*;
 
-
-    #[cfg(feature = "hell")]
-    use crate::{HELL_DATA_RATE, HELL_DELAY};
-
-    #[cfg(feature = "hell")]
-    use crate::hell;
-
-    use ublox::*;
-    use heapless::Vec;
-    use si4032_driver::ETxPower;
-    use stm32f1xx_hal::gpio::Analog;
-    use stm32f1xx_hal::pac::{ADC1, USART1, USART3};
-
-    use lexical_core::BUFFER_SIZE;
-
-    //----------------------------------------------------------------------------------------------
     #[shared]
     struct Shared {
         #[lock_free]
