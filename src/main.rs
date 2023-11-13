@@ -393,7 +393,7 @@ mod app {
             #[cfg(not(any(feature = "hell")))]
             {
                 radio.set_modulation_type(si4032_driver::ModType::GFSK);
-                radio.set_freq_deviation(0x05);
+                radio.set_freq_deviation(0x0A);
                 //radio.set_freq_offset(0x002);
                 radio.set_trxdrtscale(true);
                 radio.set_data_rate(GFSK_DATA_RATE);
@@ -402,11 +402,11 @@ mod app {
                 radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
                 // Preamble
-                radio.set_tx_prealen(0x20);
+                radio.set_tx_prealen(0x0E);
 
                 // Sync Word
                 // F8D8 = 11100110 11011000
-                radio.set_sync_wrd(0xE6D8 << 16);
+                radio.set_sync_wrd(0x4242 << 16);
 
                 // 00 -> Sync Word 3
                 // 01 -> Sync Word 3, 2
@@ -418,7 +418,7 @@ mod app {
 
 
                 // Packet Length
-                radio.set_packet_len(24);
+                radio.set_packet_len(16);
                 radio.set_tx_fixplen(false);
 
                 // CRC
@@ -478,7 +478,7 @@ mod app {
         // GFSK
         #[cfg(not(any(feature = "hell")))]
         {
-            let sym_0 = b"DEADBEEF";
+            let sym_0 = b"HAIFISCH";
 
             radio.write_fifo(sym_0);
 
