@@ -18,6 +18,8 @@ use stm32f1xx_hal::{
     timer::{CounterMs, Event},
     serial::{Config, Serial},
     spi::*,
+    timer::*,
+    timer::{pwm_input},
 };
 
 use ublox::*;
@@ -162,7 +164,7 @@ mod app {
             .pclk1(24.MHz())
             .freeze(&mut flash.acr);
 
-
+        let mut dbg = cx.device.DBGMCU;
         let mut afio = cx.device.AFIO.constrain();
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
@@ -263,13 +265,13 @@ mod app {
         let mut spst_4 = gpioc.pc15.into_push_pull_output(&mut gpioc.crh);
 
 
-        let mut spdt1_ = pb3.into_push_pull_output(&mut gpiob.crl);
+        let mut spdt_1 = pb3.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_2 = pb4.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_3 = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
 
-        let mut meas_in = gpioa.pa1.into_pull_down_input(&mut gpioa.crl);
+        let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
 
-
+        let pwm_input = Timer::new(cx.device.TIM3, &clocks);
 
         // State machine for UART receiver ---------------------------------------------------------
         let mut rxd1: u8 = 0;
