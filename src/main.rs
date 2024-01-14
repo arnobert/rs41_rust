@@ -252,9 +252,6 @@ mod app {
 
         let adc1 = stm32f1xx_hal::adc::Adc::adc1(cx.device.ADC1, clocks);
 
-
-        let _adc1_ch1 = gpioa.pa1.into_analog(&mut gpioa.crl); // Measurement out
-
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
 
@@ -269,6 +266,8 @@ mod app {
         let mut spdt1_ = pb3.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_2 = pb4.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_3 = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
+
+        let mut meas_in = gpioa.pa1.into_pull_down_input(&mut gpioa.crl);
 
 
 
