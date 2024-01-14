@@ -259,19 +259,20 @@ mod app {
 
         // Metrology interface ---------------------------------------------------------------------
 
-        let mut spst_1 = gpiob.pb6.into_push_pull_output(&mut gpiob.crl); // Boom Temp
-        let mut spst_2 = gpioa.pa3.into_push_pull_output(&mut gpioa.crl); // Boom Hygro
-        let mut spst_3 = gpioc.pc14.into_push_pull_output(&mut gpioc.crh);
-        let mut spst_4 = gpioc.pc15.into_push_pull_output(&mut gpioc.crh);
+        let mut pullup_temp = gpiob.pb12.into_push_pull_output_with_state(&mut gpiob.crh, PinState::High); // Boom Temp
+        let mut spst_1 = gpiob.pb6.into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low); // Boom Temp
+        let mut spst_2 = gpioa.pa3.into_push_pull_output_with_state(&mut gpioa.crl, PinState::Low); // Boom Hygro
+        let mut spst_3 = gpioc.pc14.into_push_pull_output_with_state(&mut gpioc.crh, PinState::Low);
+        let mut spst_4 = gpioc.pc15.into_push_pull_output_with_state(&mut gpioc.crh, PinState::High);
 
-
+        let mut pullup_hyg = gpioa.pa2.into_push_pull_output_with_state(&mut gpioa.crl, PinState::Low); // Boom Temp
         let mut spdt_1 = pb3.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_2 = pb4.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_3 = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
 
         let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
 
-        let pwm_input = Timer::new(cx.device.TIM3, &clocks);
+        let pwm_input = Timer::new(cx.device.TIM2, &clocks).counter_hz();
 
         // State machine for UART receiver ---------------------------------------------------------
         let mut rxd1: u8 = 0;
@@ -392,6 +393,8 @@ mod app {
             radio.set_freq_band(FREQBAND);
             radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
 
+            radio.init_gpio_1();
+            radio.set_gpio_1(false);
 
             radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
 
