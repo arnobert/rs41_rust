@@ -178,12 +178,6 @@ mod app {
         // GPS disabled for the moment (PinState::High -> enables)
         let mut gps_rstn = pa15.into_open_drain_output_with_state(&mut gpioa.crh, PinState::High);
 
-        // GPIO ------------------------------------------------------------------------------------
-        let mut spst_1 = gpiob.pb6.into_floating_input(&mut gpiob.crl);
-        let mut spst_2 = spst_1.into_open_drain_output(&mut gpiob.crl);
-
-        spst_2.set_low();
-
         // LEDs ------------------------------------------------------------------------------------
         let mut ledr = gpiob
             .pb8
@@ -263,6 +257,20 @@ mod app {
 
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
+
+        // Metrology interface ---------------------------------------------------------------------
+
+        let mut spst_1 = gpiob.pb6.into_push_pull_output(&mut gpiob.crl); // Boom Temp
+        let mut spst_2 = gpioa.pa3.into_push_pull_output(&mut gpioa.crl); // Boom Hygro
+        let mut spst_3 = gpioc.pc14.into_push_pull_output(&mut gpioc.crh);
+        let mut spst_4 = gpioc.pc15.into_push_pull_output(&mut gpioc.crh);
+
+
+        let mut spdt1_ = pb3.into_push_pull_output(&mut gpiob.crl);
+        let mut spdt_2 = pb4.into_push_pull_output(&mut gpiob.crl);
+        let mut spdt_3 = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
+
+
 
         // State machine for UART receiver ---------------------------------------------------------
         let mut rxd1: u8 = 0;
