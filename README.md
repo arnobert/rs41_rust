@@ -2,8 +2,6 @@
 
 ### This repo contains a new approach to a firmware for the Vaisala RS41 radiosonde, written entirely in Rust.
 
-## This project is in *very* early stage of development at the moment and only a few basic features are working at the moment (see below)!
-
 ## Obtaining the sonde
 The web contains lots of information about how to get and program a RS41.
 I am using a standard NXP LPC Link 2 with CMSIS-DAP firmware works with an adapter.
