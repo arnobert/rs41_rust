@@ -32,6 +32,10 @@ use lexical_core::BUFFER_SIZE;
 
 // CALLSIGN
 const CALLSIGN: [char; 11] = ['D', 'Q', '5', '0', 'R', 'U', 'B', ' ', 'W', 'X', ' '];
+// Carrier freq in MHz
+const CAR_FREQ: f32 = 432.2;
+
+
 
 // TX PERIOD [s]
 const TX_PERIOD: u8 = 30;
@@ -39,14 +43,21 @@ const TX_PERIOD: u8 = 30;
 // TX power
 const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
 
-// Frequency, as calculated by Python script
 const HBSEL: bool = true;
-const FREQBAND: u8 = 0x00;
-const CAR_FREQ: u16 = 0xE9A7;
+const HBSEL_F32: f32 = if HBSEL {1.0} else {0.0};
+
+
+const FREQBAND: u8 = if CAR_FREQ < 433.0 {0} else {1};
+
+const FC: f32 = (CAR_FREQ / ((26.0/3.0) * (HBSEL_F32 + 1.0)) - FREQBAND as f32 - 24.0)  * 64000.0;
+const FCU: u32 = FC as u32;
+
+const F_C_UPPER: u8 = ((FCU & 0xFF00) >> 8) as u8;
+const F_C_LOWER: u8 = (FCU & 0x00FF) as u8;
 
 // -------------------------------------------------------------------------------------------------
-const F_C_UPPER: u8 = ((CAR_FREQ & 0xFF00) >> 8) as u8;
-const F_C_LOWER: u8 = (CAR_FREQ & 0x00FF) as u8;
+//const F_C_UPPER: u8 = ((CAR_FREQ_REG & 0xFF00) >> 8) as u8;
+//const F_C_LOWER: u8 = (CAR_FREQ_REG & 0x00FF) as u8;
 
 // Hell mode parameters
 // Set data rate to:
