@@ -2,6 +2,9 @@
 
 ### This repo contains a new approach to a firmware for the Vaisala RS41 radiosonde, written entirely in Rust.
 
+[!IMPORTANT] 2024-05-03: Today I captured a RS41 with a new microcontroller: **STM32L412**. 
+This repo is developed on the **old** revision (with STM32F100). I will create a branch for the new one asap. Do not attempt to flash a new revision!
+
 ## Obtaining the sonde
 The web contains lots of information about how to get and program a RS41.
 I am using a standard NXP LPC Link 2 with CMSIS-DAP firmware works with an adapter.
