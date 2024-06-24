@@ -91,7 +91,7 @@ pub const SPIMODE: Mode = Mode {
 
 // -------------------------------------------------------------------------------------------------
 
-#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM2, TIM3, TIM4])]
+#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5])]
 mod app {
     use super::*;
 
@@ -110,7 +110,7 @@ mod app {
     #[local]
     struct Local {
         led_r: PB8<Output<PushPull>>,
-        timer_handler: CounterMs<pac::TIM1>,
+        timer_handler: CounterMs<pac::TIM2>,
 
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
@@ -209,9 +209,7 @@ mod app {
         let mut radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
 
         // Timer -----------------------------------------------------------------------------------
-        let mut timer = cx.device.TIM1.counter_ms(&clocks);
-        timer.start(1.secs()).unwrap();
-        timer.listen(Event::Update);
+
 
         // USART1 ----------------------------------------------------------------------------------
         let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
@@ -272,7 +270,12 @@ mod app {
 
         let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
 
-        let pwm_input = Timer::new(cx.device.TIM2, &clocks).counter_hz();
+
+        // TIMER -----------------------------------------------------------------------------------
+        let mut timer = cx.device.TIM2.counter_ms(&clocks);
+        timer.start(1.secs()).unwrap();
+        timer.listen(Event::Update);
+
 
         // State machine for UART receiver ---------------------------------------------------------
         let mut rxd1: u8 = 0;
@@ -316,7 +319,7 @@ mod app {
 
     #[idle()]
     fn idle(_cx: idle::Context) -> ! {
-        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
+        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(400)).unwrap();
 
         //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
@@ -336,7 +339,7 @@ mod app {
     #[task(local = [led_r])]
     fn blink_led(cx: blink_led::Context) {
         cx.local.led_r.toggle();
-        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
 
@@ -705,6 +708,15 @@ mod app {
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
     }
 
+    // TIM2 Tick -----------------------------------------------------------------------------------
+
+    #[task(binds=TIM2, local = [timer_handler])]
+    fn tim2_tick(cx: tim2_tick::Context) {
+        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
+
+        cx.local.timer_handler.clear_interrupt(Event::Update);
+
+    }
 
     // Debug UART ----------------------------------------------------------------------------------
     #[task(local = [dbg_tx], shared = [rx_buf])]
