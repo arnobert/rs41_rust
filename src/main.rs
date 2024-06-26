@@ -519,11 +519,33 @@ mod app {
             //    13    |       1      |  uint8    | Flags Byte
             //    14    |       2      |  uint16   | CRC
             
-            let sym_0 = b"HAIFISCH";
+            let payload_id: [u8; 1] = [0x42];
+            let sequence_no: [u8; 1] = [0x23];
+            let secs_day_2: [u8; 2] = [0x00, 0x01];
+            let lat: [u8; 3] = [0x03, 0x04, 0x05];
+            let long: [u8; 3] = [0x06, 0x07, 0x08];
+            let height: [u8; 2] = [0x09, 0x0A];
+            let bat_volt: [u8; 1] = [0x11];
+            let flag_byte: [u8; 1] = [0xFF];
+            let crc: [u8; 2] = [0x56, 0x57];
 
-            radio.write_fifo(sym_0);
 
-
+            radio.write_fifo(&payload_id);
+            radio.write_fifo(&sequence_no);
+            radio.write_fifo(&secs_day_2);
+            radio.write_fifo(&[lat[0]]);
+            radio.write_fifo(&[lat[1]]);
+            radio.write_fifo(&[lat[2]]);
+            radio.write_fifo(&[long[0]]);
+            radio.write_fifo(&[long[1]]);
+            radio.write_fifo(&[long[2]]);
+            radio.write_fifo(&[height[0]]);
+            radio.write_fifo(&[height[1]]);
+            radio.write_fifo(&bat_volt);
+            radio.write_fifo(&flag_byte);
+            radio.write_fifo(&[crc[0]]);
+            radio.write_fifo(&[crc[1]]);
+            
             if !radio.is_tx_on() {
                 radio.tx_on();
             }
