@@ -504,6 +504,21 @@ mod app {
         // GFSK
         #[cfg(not(any(feature = "hell")))]
         {
+            // --------------------------------
+            // HORUS V2 16 Byte Format:
+            // ---------------------------------------------------
+            // BYTE NUM | SITE (BYTES) | DATA TYPE | Description
+            // ---------------------------------------------------
+            //    0     |       1      |  uint8    | Payload ID
+            //    1     |       1      |  uint8    | Sequence No
+            //    2     |       2      |  uint16   | Secs in day / 2
+            //    4     |       3      |  Q9.15    | Latitude
+            //    7     |       3      |  Q9.15    | Longitude
+            //    10    |       2      |  uint16   | Height (m)
+            //    12    |       1      |  uint8    | Battery Voltage
+            //    13    |       1      |  uint8    | Flags Byte
+            //    14    |       2      |  uint16   | CRC
+            
             let sym_0 = b"HAIFISCH";
 
             radio.write_fifo(sym_0);
