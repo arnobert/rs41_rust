@@ -72,15 +72,21 @@ const HELL_DATA_RATE: u16 = 0x252;
 #[cfg(feature = "hell")]
 const HELL_DELAY: u32 = 150000;
 
+#[cfg(feature = "hell")]
+const COORD_HEIGHT: [char; 7] = ['H', 'E', 'I', 'G', 'H', 'T', ' '];
+
+#[cfg(feature = "hell")]
+const COORD_LEN: [char; 4] = ['L', 'E', 'N', ' '];
+
+#[cfg(feature = "hell")]
+const COORD_LONG: [char; 5] = ['L', 'O', 'N', 'G', ' '];
 
 // GFSK mode parameters.
 // 1200 Baud => 0xB6D
 const GFSK_DATA_RATE: u16 = 0xB6D;
 // -------------------------------------------------------------------------------------------------
 
-const COORD_HEIGHT: [char; 7] = ['H', 'E', 'I', 'G', 'H', 'T', ' '];
-const COORD_LEN: [char; 4] = ['L', 'E', 'N', ' '];
-const COORD_LONG: [char; 5] = ['L', 'O', 'N', 'G', ' '];
+
 
 const RX_BUF_SIZE: usize = 128;
 
@@ -518,7 +524,7 @@ mod app {
             //    12    |       1      |  uint8    | Battery Voltage
             //    13    |       1      |  uint8    | Flags Byte
             //    14    |       2      |  uint16   | CRC
-            
+
             let payload_id: [u8; 1] = [0x42];
             let sequence_no: [u8; 1] = [0x23];
             let secs_day_2: [u8; 2] = [0x00, 0x01];
@@ -545,7 +551,7 @@ mod app {
             radio.write_fifo(&flag_byte);
             radio.write_fifo(&[crc[0]]);
             radio.write_fifo(&[crc[1]]);
-            
+
             if !radio.is_tx_on() {
                 radio.tx_on();
             }
