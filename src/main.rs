@@ -214,9 +214,6 @@ mod app {
 
         let mut radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
 
-        // Timer -----------------------------------------------------------------------------------
-
-
         // USART1 ----------------------------------------------------------------------------------
         let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
         let rx = gpioa.pa10;
@@ -274,14 +271,22 @@ mod app {
         let mut spdt_2 = pb4.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_3 = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
 
-        let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
+        //let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
 
+        // fRes temp boom: ~ 60 kHz @ room temp
 
         // TIMER -----------------------------------------------------------------------------------
+
         let mut timer = cx.device.TIM2.counter_ms(&clocks);
         timer.start(1.secs()).unwrap();
         timer.listen(Event::Update);
 
+        //let pwm_input = Timer::new(cx.device.TIM2, &clocks).pwm_input(
+        //    (gpioa.pa1),
+        //    &mut afio.mapr,
+        //    &mut dbg,
+        //    Configuration::Frequency(10.kHz()),
+        //);
 
         // State machine for UART receiver ---------------------------------------------------------
         let mut rxd1: u8 = 0;
