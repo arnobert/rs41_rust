@@ -86,8 +86,6 @@ const COORD_LONG: [char; 5] = ['L', 'O', 'N', 'G', ' '];
 const GFSK_DATA_RATE: u16 = 0xB6D;
 // -------------------------------------------------------------------------------------------------
 
-
-
 const RX_BUF_SIZE: usize = 128;
 
 pub const SPIMODE: Mode = Mode {
@@ -123,7 +121,6 @@ mod app {
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
             u8>,
             PC13<Output<PushPull>>>,
-        radio_init: bool,
         freq_upper: u8,
         freq_lower: u8,
         txpwr: ETxPower,
@@ -212,7 +209,7 @@ mod app {
             clocks,
         );
 
-        let mut radioSPI = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
+        let mut radio = si4032_driver::Si4032::new(rs_spi, spi_cs_radio);
 
         // USART1 ----------------------------------------------------------------------------------
         let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
@@ -294,6 +291,119 @@ mod app {
         let mut payloadlen: u16 = 0xFFF0;
         let mut msg_cnt: u16 = 0;
 
+
+        // GPS -------------------------------------------------------------------------------------
+        // Config ublox
+
+        let packet: [u8; 28] = CfgPrtUartBuilder {
+            portid: UartPortId::Uart1,
+            reserved0: 0,
+            tx_ready: 0,
+            mode: 0x8d0.into(),
+            baud_rate: 9600,
+            in_proto_mask: InProtoMask::UBLOX,
+            out_proto_mask: OutProtoMask::UBLOX,
+            flags: 0,
+            reserved5: 0,
+        }.into_packet_bytes();
+
+        let _ = gps_tx.bwrite_all(&packet);
+        let _ = gps_tx.flush();
+
+        // Set Dynamic model: Airborne <2g
+        let model_packet = CfgNav5Builder {
+            mask: CfgNav5Params::DYN,
+            dyn_model: CfgNav5DynModel::AirborneWith4gAcceleration,
+            fix_mode: CfgNav5FixMode::default(),
+            fixed_alt: 0.0,
+            fixed_alt_var: 0.0,
+            min_elev_degrees: 0,
+            dr_limit: 0,
+            pdop: 0.0,
+            tdop: 0.0,
+            pacc: 0,
+            tacc: 0,
+            static_hold_thresh: 0.0,
+            dgps_time_out: 0,
+            cno_thresh_num_svs: 0,
+            cno_thresh: 0,
+            reserved1: [0; 2],
+            static_hold_max_dist: 0,
+            utc_standard: CfgNav5UtcStandard::default(),
+            reserved2: [0; 5],
+
+        }.into_packet_bytes();
+
+        let _ = gps_tx.bwrite_all(&model_packet);
+        gps_rx.listen();
+
+
+        // Init Radio ------------------------------------------------------------------------------
+        radio.swreset();
+        while !(radio.chip_ready()) {};
+
+        // Set frequencies
+        radio.set_hb_sel(HBSEL);
+        radio.set_freq_band(FREQBAND);
+        radio.set_freq(F_C_UPPER, F_C_LOWER);
+
+        radio.init_gpio_1();
+        radio.set_gpio_1(false);
+
+        radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
+
+        // Config for HELL mode ----------------------------------------------------------------
+        #[cfg(feature = "hell")]
+        {
+            radio.set_modulation_type(si4032_driver::ModType::OOK);
+            radio.set_auto_packet_handler(false);
+            radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
+
+            radio.set_trxdrtscale(true);
+            radio.set_data_rate(HELL_DATA_RATE);
+            // CRC
+            radio.set_crc(false);
+        }
+
+
+        // Config for GFSK mode ----------------------------------------------------------------
+        #[cfg(not(any(feature = "hell")))]
+        {
+            radio.set_modulation_type(si4032_driver::ModType::GFSK);
+            radio.set_freq_deviation(0x0A);
+            //radio.set_freq_offset(0x002);
+            radio.set_trxdrtscale(true);
+            radio.set_data_rate(GFSK_DATA_RATE);
+
+            radio.set_auto_packet_handler(true);
+            radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
+
+            // Preamble
+            radio.set_tx_prealen(0x0E);
+
+            // Sync Word
+            // F8D8 = 11100110 11011000
+            radio.set_sync_wrd(0x4242 << 16);
+
+            // 00 -> Sync Word 3
+            // 01 -> Sync Word 3, 2
+            radio.set_tx_sync_len(0x01);
+
+
+            // TX Header
+            radio.set_tx_header_len(0);
+
+
+            // Packet Length
+            radio.set_packet_len(16);
+            radio.set_tx_fixplen(false);
+
+            // CRC
+            //radio.set_crc(false);
+        }
+
+        radio.enter_tx();
+
         // End init --------------------------------------------------------------------------------
         (
             Shared {
@@ -306,8 +416,7 @@ mod app {
             Local {
                 led_r: ledr,
                 timer_handler: timer,
-                radio_spi: radioSPI,
-                radio_init: false,
+                radio_spi: radio,
                 freq_upper: F_C_UPPER,
                 freq_lower: F_C_LOWER,
                 txpwr: TX_POWER,
@@ -330,14 +439,8 @@ mod app {
 
     #[idle()]
     fn idle(_cx: idle::Context) -> ! {
-        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
         read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(400)).unwrap();
-
-        //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
-        config_gps::spawn_after(Duration::<u64, 1, 1000>::from_ticks(5000)).unwrap();
-        query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10000)).unwrap();
-
-        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
 
 
         loop {
@@ -363,7 +466,7 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(priority = 3, local = [radio_spi, radio_init, freq_upper, freq_lower, txpwr], shared = [position])]
+    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr], shared = [position, gps_tx])]
     fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
 
@@ -374,6 +477,11 @@ mod app {
         let mut position_long = [b'0'; BUFFER_SIZE];
         let mut position_height = [b'0'; BUFFER_SIZE];
 
+        // GNSS Get Position
+        let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
+        let tx = cx.shared.gps_tx;
+        let _ = tx.bwrite_all(&packet);
+        let _ = tx.flush();
 
         let mut c_len: [char; 16] = ['.'; 16];
         let mut c_long: [char; 16] = ['.'; 16];
@@ -395,79 +503,6 @@ mod app {
                 c_height[c] = char::from(position_height[c]);
             }
         });
-
-
-        // Init Radio ------------------------------------------------------------------------------
-        if !*cx.local.radio_init {
-            radio.swreset();
-            while !(radio.chip_ready()) {};
-
-            // Set frequencies
-            radio.set_hb_sel(HBSEL);
-            radio.set_freq_band(FREQBAND);
-            radio.set_freq(*cx.local.freq_upper, *cx.local.freq_lower);
-
-            radio.init_gpio_1();
-            radio.set_gpio_1(false);
-
-            radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
-
-            // Config for HELL mode ----------------------------------------------------------------
-            #[cfg(feature = "hell")]
-            {
-                radio.set_modulation_type(si4032_driver::ModType::OOK);
-                radio.set_auto_packet_handler(false);
-                radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
-
-                radio.set_trxdrtscale(true);
-                radio.set_data_rate(HELL_DATA_RATE);
-                // CRC
-                radio.set_crc(false);
-            }
-
-
-            // Config for GFSK mode ----------------------------------------------------------------
-            #[cfg(not(any(feature = "hell")))]
-            {
-                radio.set_modulation_type(si4032_driver::ModType::GFSK);
-                radio.set_freq_deviation(0x0A);
-                //radio.set_freq_offset(0x002);
-                radio.set_trxdrtscale(true);
-                radio.set_data_rate(GFSK_DATA_RATE);
-
-                radio.set_auto_packet_handler(true);
-                radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
-
-                // Preamble
-                radio.set_tx_prealen(0x0E);
-
-                // Sync Word
-                // F8D8 = 11100110 11011000
-                radio.set_sync_wrd(0x4242 << 16);
-
-                // 00 -> Sync Word 3
-                // 01 -> Sync Word 3, 2
-                radio.set_tx_sync_len(0x01);
-
-
-                // TX Header
-                radio.set_tx_header_len(0);
-
-
-                // Packet Length
-                radio.set_packet_len(16);
-                radio.set_tx_fixplen(false);
-
-                // CRC
-                //radio.set_crc(false);
-            }
-
-            radio.enter_tx();
-            *cx.local.radio_init = true;
-        }
-
-        // TEXT TO BE SENT:
-        // $CALL$ POS:00.00000N, 00.00000E, 13370M
 
         // OOK / HELL
         #[cfg(feature = "hell")]
@@ -561,69 +596,20 @@ mod app {
                 radio.tx_on();
             }
         }
-        //tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(30000)).unwrap();
+        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
     }
 
 
-    // GPS -----------------------------------------------------------------------------------------
-    // Config ublox
-    #[task(shared = [gps_tx, gps_rx])]
-    fn config_gps(mut cx: config_gps::Context) {
-        let packet: [u8; 28] = CfgPrtUartBuilder {
-            portid: UartPortId::Uart1,
-            reserved0: 0,
-            tx_ready: 0,
-            mode: 0x8d0,
-            baud_rate: 9600,
-            in_proto_mask: 0x01,
-            out_proto_mask: 0x01,
-            flags: 0,
-            reserved5: 0,
-        }.into_packet_bytes();
-
-        _ = cx.shared.gps_tx.bwrite_all(&packet);
-        _ = cx.shared.gps_tx.flush();
-
-        // Set Dynamic model: Airborne <2g
-        let model_packet = CfgNav5Builder {
-            mask: CfgNav5Params::DYN,
-            dyn_model: CfgNav5DynModel::AirborneWith4gAcceleration,
-            fix_mode: CfgNav5FixMode::default(),
-            fixed_alt: 0.0,
-            fixed_alt_var: 0.0,
-            min_elev_degrees: 0,
-            dr_limit: 0,
-            pdop: 0.0,
-            tdop: 0.0,
-            pacc: 0,
-            tacc: 0,
-            static_hold_thresh: 0.0,
-            dgps_time_out: 0,
-            cno_thresh_num_svs: 0,
-            cno_thresh: 0,
-            reserved1: [0; 2],
-            static_hold_max_dist: 0,
-            utc_standard: CfgNav5UtcStandard::default(),
-            reserved2: [0; 5],
-
-        }.into_packet_bytes();
-
-        _ = cx.shared.gps_tx.bwrite_all(&model_packet);
-        cx.shared.gps_rx.listen();
-    }
-
-
+    /*
     #[task(shared = [gps_tx])]
-    fn query_pos(mut cx: query_pos::Context) {
-        let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
+    fn query_time(mut cx: query_time::Context) {
+        let packet = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
         _ = cx.shared.gps_tx.bwrite_all(&packet);
         _ = cx.shared.gps_tx.flush();
-        query_pos::spawn_after(Duration::<u64, 1, 1000>::from_ticks(3000)).unwrap();
     }
-
-
+*/
     // Receiving data from ublox isr ---------------------------------------------------------------
-    #[task(binds = USART1, shared = [rx_buf, gps_rx], local = [rxd_t1, st_det, payload_len, msg_cnt])]
+    #[task(priority = 3, binds = USART1, shared = [rx_buf, gps_rx], local = [rxd_t1, st_det, payload_len, msg_cnt])]
     fn isr_gps(mut cx: isr_gps::Context) {
         let rx = cx.shared.gps_rx;
 
@@ -721,6 +707,7 @@ mod app {
                                 });
                             }
 
+                            PacketRef::NavTimeUTC(pack) => {}
                             _ => {}
                         };
                     }
@@ -735,7 +722,6 @@ mod app {
             }
         });
         //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
     }
 
     // ADC measurements ----------------------------------------------------------------------------
@@ -760,7 +746,7 @@ mod app {
 
     #[task(binds=TIM2, local = [timer_handler])]
     fn tim2_tick(cx: tim2_tick::Context) {
-        blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
+        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
 
         cx.local.timer_handler.clear_interrupt(Event::Update);
 
