@@ -97,6 +97,8 @@ pub const SPIMODE: Mode = Mode {
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5])]
 mod app {
+    use rtic::Mutex;
+    use crate::app::shared_resources::utc_hour_that_needs_to_be_locked;
     use super::*;
 
     #[shared]
@@ -104,16 +106,21 @@ mod app {
         #[lock_free]
         led_g: PB7<Output<PushPull>>,
         position: [f64; 3],
+        utc_hour: u8,
+        utc_min: u8,
+        utc_sec: u8,
         #[lock_free]
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
-        #[lock_free]
-        gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
+        //#[lock_free]
+        //gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
+        gps_rx_idle: bool,
         rx_buf: Vec<u8, RX_BUF_SIZE>,
     }
 
     #[local]
     struct Local {
         led_r: PB8<Output<PushPull>>,
+        gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
         timer_handler: CounterMs<pac::TIM2>,
 
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
@@ -408,12 +415,17 @@ mod app {
         (
             Shared {
                 position: [0.0, 0.0, 0.0],
+                utc_hour: 0,
+                utc_min: 0,
+                utc_sec: 0,
                 led_g: ledg,
                 gps_tx,
-                gps_rx,
+                //gps_rx,
                 rx_buf: rxbuf,
+                gps_rx_idle: true,
             },
             Local {
+                gps_rx,
                 led_r: ledr,
                 timer_handler: timer,
                 radio_spi: radio,
@@ -466,9 +478,18 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr], shared = [position, gps_tx])]
+    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr], shared = [position, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec])]
     fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
+        let mut gps_rx_idle = cx.shared.gps_rx_idle;
+
+        let mut utc_hour = cx.shared.utc_hour;
+        let mut utc_min = cx.shared.utc_min;
+        let mut utc_sec = cx.shared.utc_sec;
+
+        let mut hour: u8 = 0;
+        let mut min: u8 = 0;
+        let mut sec: u8 = 0;
 
         // Getting position data
         let mut position = cx.shared.position;
@@ -477,11 +498,30 @@ mod app {
         let mut position_long = [b'0'; BUFFER_SIZE];
         let mut position_height = [b'0'; BUFFER_SIZE];
 
+
+        // GNSS-------------------------------------------------------------------------------------
+        let tx = cx.shared.gps_tx;
+
         // GNSS Get Position
         let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
-        let tx = cx.shared.gps_tx;
-        let _ = tx.bwrite_all(&packet);
-        let _ = tx.flush();
+        //let _ = tx.bwrite_all(&packet);
+        //let _ = tx.flush();
+
+        let mut rx_lock: bool = true;
+
+        /*
+        while rx_lock{
+            gps_rx_idle.lock(|gps_rx_idle| {
+                rx_lock = *gps_rx_idle;
+            });
+            cortex_m::asm::delay(1000);
+        };
+        */
+        // GNSS Get Time (UTC)
+        let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
+        _ = tx.bwrite_all(&packet_utc);
+        _ = tx.flush();
+
 
         let mut c_len: [char; 16] = ['.'; 16];
         let mut c_long: [char; 16] = ['.'; 16];
@@ -536,14 +576,45 @@ mod app {
 
             tx_hell(&CALLSIGN, radio);
 
-            tx_hell(&COORD_HEIGHT, radio);
-            tx_hell(&c_height, radio);
+            //tx_hell(&COORD_HEIGHT, radio);
+            //tx_hell(&c_height, radio);
 
-            tx_hell(&COORD_LEN, radio);
-            tx_hell(&c_len, radio);
+            //tx_hell(&COORD_LEN, radio);
+            //tx_hell(&c_len, radio);
 
-            tx_hell(&COORD_LONG, radio);
-            tx_hell(&c_long, radio);
+            //tx_hell(&COORD_LONG, radio);
+            //tx_hell(&c_long, radio);
+
+            (utc_hour, utc_min, utc_sec).lock(|utc_hour, utc_min, utc_sec| {
+                hour = *utc_hour;
+                min = *utc_min;
+                sec = *utc_sec;
+            });
+
+
+            let mut p_hour = [b'0'; BUFFER_SIZE];
+            let mut p_min  = [b'0'; BUFFER_SIZE];
+            let mut p_sec  = [b'0'; BUFFER_SIZE];
+
+            let _ = lexical_core::write(hour, &mut p_hour);
+            let _ = lexical_core::write(min, &mut p_min);
+            let _ = lexical_core::write(sec, &mut p_sec);
+
+            let mut c_hour: [char; 4] = ['x'; 4];
+            let mut c_min: [char; 4] = ['x'; 4];
+            let mut c_sec: [char; 4] = ['x'; 4];
+
+
+            for c in 0..3 {
+                c_hour[c] = char::from(p_hour[c]);
+                c_min[c] = char::from(p_min[c]);
+                c_sec[c] = char::from(p_sec[c]);
+            }
+
+            tx_hell(&c_hour[0..2], radio);
+            tx_hell(&c_min[0..2], radio);
+            tx_hell(&c_sec[0..2], radio);
+
         }
 
 
@@ -600,21 +671,16 @@ mod app {
     }
 
 
-    /*
-    #[task(shared = [gps_tx])]
-    fn query_time(mut cx: query_time::Context) {
-        let packet = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
-        _ = cx.shared.gps_tx.bwrite_all(&packet);
-        _ = cx.shared.gps_tx.flush();
-    }
-*/
+
     // Receiving data from ublox isr ---------------------------------------------------------------
-    #[task(priority = 3, binds = USART1, shared = [rx_buf, gps_rx], local = [rxd_t1, st_det, payload_len, msg_cnt])]
+    #[task(priority = 3, binds = USART1, shared = [rx_buf, gps_rx_idle], local = [gps_rx, rxd_t1, st_det, payload_len, msg_cnt])]
     fn isr_gps(mut cx: isr_gps::Context) {
-        let rx = cx.shared.gps_rx;
+        //let rx = cx.shared.gps_rx;
+        let rx = cx.local.gps_rx;
 
         let mut rx_buf = cx.shared.rx_buf;
         let mut rxd1 = cx.local.rxd_t1;
+        let mut gps_rx_idle = cx.shared.gps_rx_idle;
         let mut start_detect = cx.local.st_det;
         let mut payload_len = cx.local.payload_len;
         let mut msg_cnt = cx.local.msg_cnt;
@@ -634,6 +700,12 @@ mod app {
                 // Detecting magic word 0xB5 0x62
                 if (!*start_detect) && (*rxd1 == 0xB5) && (rxd == 0x62) {
                     *start_detect = true;
+
+                    gps_rx_idle.lock(|gps_rx_idle| {
+                        *gps_rx_idle = false;
+                    }
+                    );
+
                     rx_buf.lock(|rx_buf| {
                         rx_buf.clear();
                         _ = rx_buf.push(0xB5);
@@ -661,6 +733,14 @@ mod app {
                         // Message complete
                         if *msg_cnt >= (*payload_len + 8) {
                             *start_detect = false;
+
+
+                            gps_rx_idle.lock(|gps_rx_idle| {
+                                *gps_rx_idle = true;
+                            }
+                            );
+
+
                             *msg_cnt = 0;
                             *payload_len = 0xFFF0;
                             parse_gps_data::spawn().unwrap();
@@ -668,7 +748,7 @@ mod app {
                     });
                 }
             }
-            Err(e) => {
+            Err (e) => {
                 match e {
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Overrun) => {}
                     nb::Error::Other(stm32f1xx_hal::serial::Error::Framing) => {}
@@ -680,10 +760,14 @@ mod app {
         }
     }
 
-    #[task(shared = [position, rx_buf])]
+    #[task(shared = [position, rx_buf, utc_hour, utc_min, utc_sec])]
     fn parse_gps_data(cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
+
+        let mut utc_hour = cx.shared.utc_hour;
+        let mut utc_min = cx.shared.utc_min;
+        let mut utc_sec = cx.shared.utc_sec;
 
 
         // Local buffer
@@ -707,7 +791,23 @@ mod app {
                                 });
                             }
 
-                            PacketRef::NavTimeUTC(pack) => {}
+                            PacketRef::NavTimeUTC(pack) => {
+
+                                utc_hour.lock(|utc_hour| {
+                                    *utc_hour = pack.hour();
+                                });
+
+                                utc_min.lock(|utc_min| {
+                                    *utc_min = pack.min();
+                                });
+
+                                utc_sec.lock(|utc_sec| {
+                                    *utc_sec = pack.sec();
+                                });
+
+                                let m = pack.hour() + pack.min();
+
+                            }
                             _ => {}
                         };
                     }
@@ -725,8 +825,9 @@ mod app {
     }
 
     // ADC measurements ----------------------------------------------------------------------------
-    #[task(shared = [led_g], local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
+    #[task(priority = 4, local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
     fn read_adc(cx: read_adc::Context) {
+
         let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
         let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
 
@@ -736,10 +837,10 @@ mod app {
 
         if (vbat - pbut) < 100 {
             *cx.local.shutdown_next_cycle = true;
-            cx.shared.led_g.set_high();
+            //cx.shared.led_g.set_high();
         }
 
-        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2000)).unwrap();
+        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
     }
 
     // TIM2 Tick -----------------------------------------------------------------------------------
