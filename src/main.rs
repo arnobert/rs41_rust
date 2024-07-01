@@ -524,24 +524,21 @@ mod app {
         }
 
 
+        let packet_pos = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
+        let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
+
+        let mut position_len = [b'0'; BUFFER_SIZE];
+        let mut position_long = [b'0'; BUFFER_SIZE];
+        let mut position_height = [b'0'; BUFFER_SIZE];
+
         loop {
-            // GNSS Get Position
-            let packet_pos = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
+
             tx.lock(|tx| {
                 let _ = tx.bwrite_all(&packet_pos);
-                let _ = tx.flush();
-            });
-
-             // GNSS Get Time (UTC)
-            let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
-            tx.lock(|tx| {
+                cortex_m::asm::delay(10000000);
                 let _ = tx.bwrite_all(&packet_utc);
                 let _ = tx.flush();
             });
-
-            let mut position_len = [b'0'; BUFFER_SIZE];
-            let mut position_long = [b'0'; BUFFER_SIZE];
-            let mut position_height = [b'0'; BUFFER_SIZE];
 
             position.lock(|position| {
                 let _ = lexical_core::write(position[0], &mut position_len);
@@ -744,7 +741,6 @@ mod app {
     async fn parse_gps_data(cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
-
         let mut utc_hour = cx.shared.utc_hour;
         let mut utc_min = cx.shared.utc_min;
         let mut utc_sec = cx.shared.utc_sec;
@@ -801,8 +797,6 @@ mod app {
                 }
             }
         });
-        Systick::delay(1000.millis()).await;
-        //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
     }
 
 
