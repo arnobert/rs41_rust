@@ -495,15 +495,45 @@ mod app {
         // GNSS-------------------------------------------------------------------------------------
         let mut tx = cx.shared.gps_tx;
 
-        // GNSS Get Position
-        let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
-        tx.lock(|tx| {
-            let _ = tx.bwrite_all(&packet);
-            let _ = tx.flush();
-        });
+        fn tx_hell(txdt: &[u8], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
+            stm32f1xx_hal::spi::Spi2NoRemap,
+            (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
+            PC13<Output<PushPull>>>)
+        {
 
-        //let mut rx_lock: bool = true;
-        /*
+            for txchar in txdt {
+                let h_symbol: u128 = hell::get_char(char::from(*txchar));
+                let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
+
+                for txcnt in 0..16
+                {
+                    let sym = [h_bytes[txcnt as usize]];
+                    tradio.write_fifo(&sym);
+                    tradio.tx_on();
+
+                    while !(tradio.fifo_empty())
+                    {
+                        cortex_m::asm::nop();
+                    }
+                }
+
+                for _ in 0..HELL_DELAY {
+                    cortex_m::asm::nop();
+                }
+            }
+        }
+
+
+        loop {
+            // GNSS Get Position
+            let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
+            tx.lock(|tx| {
+                let _ = tx.bwrite_all(&packet);
+                let _ = tx.flush();
+            });
+
+            //let mut rx_lock: bool = true;
+            /*
         while rx_lock{
             gps_rx_idle.lock(|gps_rx_idle| {
                 rx_lock = *gps_rx_idle;
@@ -512,67 +542,41 @@ mod app {
         };
         */
 
-        // GNSS Get Time (UTC)
-        let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
-        //_ = tx.bwrite_all(&packet_utc);
-        //_ = tx.flush();
+            // GNSS Get Time (UTC)
+            let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
+            //_ = tx.bwrite_all(&packet_utc);
+            //_ = tx.flush();
 
-        let mut position_len = [b'0'; BUFFER_SIZE];
-        let mut position_long = [b'0'; BUFFER_SIZE];
-        let mut position_height = [b'0'; BUFFER_SIZE];
+            let mut position_len = [b'0'; BUFFER_SIZE];
+            let mut position_long = [b'0'; BUFFER_SIZE];
+            let mut position_height = [b'0'; BUFFER_SIZE];
 
-        position.lock(|position| {
-            let _ = lexical_core::write(position[0], &mut position_len);
-            let _ = lexical_core::write(position[1], &mut position_long);
-            let _ = lexical_core::write(position[2], &mut position_height);
-        });
+            position.lock(|position| {
+                let _ = lexical_core::write(position[0], &mut position_len);
+                let _ = lexical_core::write(position[1], &mut position_long);
+                let _ = lexical_core::write(position[2], &mut position_height);
+            });
 
-        let (f_len, _) = position_len.split_at_mut(8);
-        let (f_long, _) = position_long.split_at_mut(8);
-        let (f_height, _) = position_height.split_at_mut(5);
+            let (f_len, _) = position_len.split_at_mut(8);
+            let (f_long, _) = position_long.split_at_mut(8);
+            let (f_height, _) = position_height.split_at_mut(5);
 
-        // OOK / HELL
-        #[cfg(feature = "hell")]
-        {
-            fn tx_hell(txdt: &[u8], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
-                stm32f1xx_hal::spi::Spi2NoRemap,
-                (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
-                PC13<Output<PushPull>>>)
+            // OOK / HELL
+            #[cfg(feature = "hell")]
             {
+                tx_hell(CALLSIGN, radio);
 
-                for txchar in txdt {
-                    let h_symbol: u128 = hell::get_char(char::from(*txchar));
-                    let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
+                tx_hell(COORD_HEIGHT, radio);
+                tx_hell(f_height, radio);
 
-                    for txcnt in 0..16
-                    {
-                        let sym = [h_bytes[txcnt as usize]];
-                        tradio.write_fifo(&sym);
-                        tradio.tx_on();
+                tx_hell(COORD_LEN, radio);
+                tx_hell(f_len, radio);
 
-                        while !(tradio.fifo_empty())
-                        {
-                            cortex_m::asm::nop();
-                        }
-                    }
+                tx_hell(COORD_LONG, radio);
+                tx_hell(&f_long, radio);
 
-                    for _ in 0..HELL_DELAY {
-                        cortex_m::asm::nop();
-                    }
-                }
-            }
 
-            tx_hell(CALLSIGN, radio);
-
-            tx_hell(COORD_HEIGHT, radio);
-            tx_hell(f_height, radio);
-
-            tx_hell(COORD_LEN, radio);
-            tx_hell(f_len, radio);
-
-            tx_hell(COORD_LONG, radio);
-            tx_hell(&f_long, radio);
-
+                /*
             (utc_hour, utc_min, utc_sec).lock(|utc_hour, utc_min, utc_sec| {
                 hour = *utc_hour;
                 min = *utc_min;
@@ -599,64 +603,67 @@ mod app {
                 c_sec[c] = char::from(p_sec[c]);
             }
 
-            /*
+
             tx_hell(&c_hour[0..2], radio);
             tx_hell(&c_min[0..2], radio);
             tx_hell(&c_sec[0..2], radio);
             */
-        }
-
-
-        // GFSK
-        #[cfg(not(any(feature = "hell")))]
-        {
-            // --------------------------------
-            // HORUS V2 16 Byte Format:
-            // ---------------------------------------------------
-            // BYTE NUM | SITE (BYTES) | DATA TYPE | Description
-            // ---------------------------------------------------
-            //    0     |       1      |  uint8    | Payload ID
-            //    1     |       1      |  uint8    | Sequence No
-            //    2     |       2      |  uint16   | Secs in day / 2
-            //    4     |       3      |  Q9.15    | Latitude
-            //    7     |       3      |  Q9.15    | Longitude
-            //    10    |       2      |  uint16   | Height (m)
-            //    12    |       1      |  uint8    | Battery Voltage
-            //    13    |       1      |  uint8    | Flags Byte
-            //    14    |       2      |  uint16   | CRC
-
-            let payload_id: [u8; 1] = [0x42];
-            let sequence_no: [u8; 1] = [0x23];
-            let secs_day_2: [u8; 2] = [0x00, 0x01];
-            let lat: [u8; 3] = [0x03, 0x04, 0x05];
-            let long: [u8; 3] = [0x06, 0x07, 0x08];
-            let height: [u8; 2] = [0x09, 0x0A];
-            let bat_volt: [u8; 1] = [0x11];
-            let flag_byte: [u8; 1] = [0xFF];
-            let crc: [u8; 2] = [0x56, 0x57];
-
-
-            radio.write_fifo(&payload_id);
-            radio.write_fifo(&sequence_no);
-            radio.write_fifo(&secs_day_2);
-            radio.write_fifo(&[lat[0]]);
-            radio.write_fifo(&[lat[1]]);
-            radio.write_fifo(&[lat[2]]);
-            radio.write_fifo(&[long[0]]);
-            radio.write_fifo(&[long[1]]);
-            radio.write_fifo(&[long[2]]);
-            radio.write_fifo(&[height[0]]);
-            radio.write_fifo(&[height[1]]);
-            radio.write_fifo(&bat_volt);
-            radio.write_fifo(&flag_byte);
-            radio.write_fifo(&[crc[0]]);
-            radio.write_fifo(&[crc[1]]);
-
-            if !radio.is_tx_on() {
-                radio.tx_on();
             }
+
+
+            // GFSK
+            #[cfg(not(any(feature = "hell")))]
+            {
+                // --------------------------------
+                // HORUS V2 16 Byte Format:
+                // ---------------------------------------------------
+                // BYTE NUM | SITE (BYTES) | DATA TYPE | Description
+                // ---------------------------------------------------
+                //    0     |       1      |  uint8    | Payload ID
+                //    1     |       1      |  uint8    | Sequence No
+                //    2     |       2      |  uint16   | Secs in day / 2
+                //    4     |       3      |  Q9.15    | Latitude
+                //    7     |       3      |  Q9.15    | Longitude
+                //    10    |       2      |  uint16   | Height (m)
+                //    12    |       1      |  uint8    | Battery Voltage
+                //    13    |       1      |  uint8    | Flags Byte
+                //    14    |       2      |  uint16   | CRC
+
+                let payload_id: [u8; 1] = [0x42];
+                let sequence_no: [u8; 1] = [0x23];
+                let secs_day_2: [u8; 2] = [0x00, 0x01];
+                let lat: [u8; 3] = [0x03, 0x04, 0x05];
+                let long: [u8; 3] = [0x06, 0x07, 0x08];
+                let height: [u8; 2] = [0x09, 0x0A];
+                let bat_volt: [u8; 1] = [0x11];
+                let flag_byte: [u8; 1] = [0xFF];
+                let crc: [u8; 2] = [0x56, 0x57];
+
+
+                radio.write_fifo(&payload_id);
+                radio.write_fifo(&sequence_no);
+                radio.write_fifo(&secs_day_2);
+                radio.write_fifo(&[lat[0]]);
+                radio.write_fifo(&[lat[1]]);
+                radio.write_fifo(&[lat[2]]);
+                radio.write_fifo(&[long[0]]);
+                radio.write_fifo(&[long[1]]);
+                radio.write_fifo(&[long[2]]);
+                radio.write_fifo(&[height[0]]);
+                radio.write_fifo(&[height[1]]);
+                radio.write_fifo(&bat_volt);
+                radio.write_fifo(&flag_byte);
+                radio.write_fifo(&[crc[0]]);
+                radio.write_fifo(&[crc[1]]);
+
+                if !radio.is_tx_on() {
+                    radio.tx_on();
+                }
+            }
+            Systick::delay(1000.millis()).await;
         }
-        Systick::delay(1000.millis()).await;
+
+
     }
 
 
@@ -750,7 +757,7 @@ mod app {
         }
     }
 
-    #[task(priority = 1, shared = [position, rx_buf, utc_hour, utc_min, utc_sec])]
+    #[task(priority = 4, shared = [position, rx_buf, utc_hour, utc_min, utc_sec])]
     async fn parse_gps_data(cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
