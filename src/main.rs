@@ -531,9 +531,9 @@ mod app {
             let _ = lexical_core::write(position[2], &mut position_height);
         });
 
-        let (f_len, _) = position_len.split_at_mut(15);
-        let (f_long, _) = position_long.split_at_mut(15);
-        let (f_height, _) = position_height.split_at_mut(15);
+        let (f_len, _) = position_len.split_at_mut(8);
+        let (f_long, _) = position_long.split_at_mut(8);
+        let (f_height, _) = position_height.split_at_mut(5);
 
         // OOK / HELL
         #[cfg(feature = "hell")]
