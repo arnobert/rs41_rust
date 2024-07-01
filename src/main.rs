@@ -526,26 +526,18 @@ mod app {
 
         loop {
             // GNSS Get Position
-            let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
+            let packet_pos = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
             tx.lock(|tx| {
-                let _ = tx.bwrite_all(&packet);
+                let _ = tx.bwrite_all(&packet_pos);
                 let _ = tx.flush();
             });
 
-            //let mut rx_lock: bool = true;
-            /*
-        while rx_lock{
-            gps_rx_idle.lock(|gps_rx_idle| {
-                rx_lock = *gps_rx_idle;
-            });
-            cortex_m::asm::delay(1000);
-        };
-        */
-
-            // GNSS Get Time (UTC)
+             // GNSS Get Time (UTC)
             let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
-            //_ = tx.bwrite_all(&packet_utc);
-            //_ = tx.flush();
+            tx.lock(|tx| {
+                let _ = tx.bwrite_all(&packet_utc);
+                let _ = tx.flush();
+            });
 
             let mut position_len = [b'0'; BUFFER_SIZE];
             let mut position_long = [b'0'; BUFFER_SIZE];
@@ -687,6 +679,7 @@ mod app {
         }
 
         let rxb = rx.read();
+        let mut rx_complete: bool = false;
 
         match rxb {
             Ok(t) => {
@@ -723,13 +716,17 @@ mod app {
                         // Message complete
                         if *msg_cnt >= (*payload_len + 8) {
                             *start_detect = false;
-
+                            rx_complete = true;
                             *msg_cnt = 0;
                             *payload_len = 0xFFF0;
-                            parse_gps_data::spawn().unwrap();
+                             //parse_gps_data::spawn().unwrap();
                         }
                     });
                 }
+                if rx_complete {
+                    parse_gps_data::spawn().unwrap();
+                };
+
             }
             Err (e) => {
                 match e {
