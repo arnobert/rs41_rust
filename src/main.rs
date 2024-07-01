@@ -480,6 +480,7 @@ mod app {
         let radio = cx.local.radio_spi;
         let mut gps_rx_idle = cx.shared.gps_rx_idle;
 
+
         let mut utc_hour = cx.shared.utc_hour;
         let mut utc_min = cx.shared.utc_min;
         let mut utc_sec = cx.shared.utc_sec;
@@ -564,39 +565,36 @@ mod app {
                 tx_hell(COORD_LONG, radio);
                 tx_hell(&f_long, radio);
 
+                utc_hour.lock(|utc_hour| {
+                    hour = *utc_hour;
+                });
 
-                /*
-            (utc_hour, utc_min, utc_sec).lock(|utc_hour, utc_min, utc_sec| {
-                hour = *utc_hour;
-                min = *utc_min;
-                sec = *utc_sec;
-            });
+                utc_min.lock(|utc_min| {
+                    min = *utc_min;
+                });
 
-
-            let mut p_hour = [b'0'; BUFFER_SIZE];
-            let mut p_min  = [b'0'; BUFFER_SIZE];
-            let mut p_sec  = [b'0'; BUFFER_SIZE];
-
-            let _ = lexical_core::write(hour, &mut p_hour);
-            let _ = lexical_core::write(min, &mut p_min);
-            let _ = lexical_core::write(sec, &mut p_sec);
-
-            let mut c_hour: [char; 4] = ['x'; 4];
-            let mut c_min: [char; 4] = ['x'; 4];
-            let mut c_sec: [char; 4] = ['x'; 4];
+                utc_sec.lock(|utc_sec| {
+                    sec = *utc_sec
+                });
 
 
-            for c in 0..3 {
-                c_hour[c] = char::from(p_hour[c]);
-                c_min[c] = char::from(p_min[c]);
-                c_sec[c] = char::from(p_sec[c]);
-            }
+                let mut p_hour = [b'0'; BUFFER_SIZE];
+                let mut p_min  = [b'0'; BUFFER_SIZE];
+                let mut p_sec  = [b'0'; BUFFER_SIZE];
+
+                let _ = lexical_core::write(hour, &mut p_hour);
+                let _ = lexical_core::write(min, &mut p_min);
+                let _ = lexical_core::write(sec, &mut p_sec);
+
+                let (f_hour, _) = p_hour.split_at_mut(2);
+                let (f_min, _) = p_min.split_at_mut(2);
+                let (f_sec, _) = p_sec.split_at_mut(2);
 
 
-            tx_hell(&c_hour[0..2], radio);
-            tx_hell(&c_min[0..2], radio);
-            tx_hell(&c_sec[0..2], radio);
-            */
+                tx_hell(&f_hour, radio);
+                tx_hell(&f_min, radio);
+                tx_hell(&f_sec, radio);
+
             }
 
 
