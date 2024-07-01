@@ -77,15 +77,12 @@ const HELL_DELAY: u32 = 150000;
 
 #[cfg(feature = "hell")]
 const COORD_HEIGHT: &[u8; 7] = b"HEIGHT ";
-//const COORD_HEIGHT: [char; 7] = ['H', 'E', 'I', 'G', 'H', 'T', ' '];
 
 #[cfg(feature = "hell")]
 const COORD_LEN: &[u8; 4] = b"LEN ";
-//const COORD_LEN: [char; 4] = ['L', 'E', 'N', ' '];
 
 #[cfg(feature = "hell")]
 const COORD_LONG: &[u8; 5] = b"LONG ";
-//const COORD_LONG: [char; 5] = ['L', 'O', 'N', 'G', ' '];
 
 // GFSK mode parameters.
 // 1200 Baud => 0xB6D
