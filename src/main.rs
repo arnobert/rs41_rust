@@ -33,7 +33,10 @@ use lexical_core::BUFFER_SIZE;
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const CALLSIGN: [char; 11] = ['D', 'Q', '5', '0', 'R', 'U', 'B', ' ', 'W', 'X', ' '];
+//const CALLSIGN: [char; 11] = ['D', 'Q', '5', '0', 'R', 'U', 'B', ' ', 'W', 'X', ' '];
+const CALLSIGN: &[u8; 11] = b"DQ50RUB WX ";
+
+
 // Carrier freq in MHz
 const CAR_FREQ: f32 = 432.2;
 
@@ -73,13 +76,16 @@ const HELL_DATA_RATE: u16 = 0x252;
 const HELL_DELAY: u32 = 150000;
 
 #[cfg(feature = "hell")]
-const COORD_HEIGHT: [char; 7] = ['H', 'E', 'I', 'G', 'H', 'T', ' '];
+const COORD_HEIGHT: &[u8; 7] = b"HEIGHT ";
+//const COORD_HEIGHT: [char; 7] = ['H', 'E', 'I', 'G', 'H', 'T', ' '];
 
 #[cfg(feature = "hell")]
-const COORD_LEN: [char; 4] = ['L', 'E', 'N', ' '];
+const COORD_LEN: &[u8; 4] = b"LEN ";
+//const COORD_LEN: [char; 4] = ['L', 'E', 'N', ' '];
 
 #[cfg(feature = "hell")]
-const COORD_LONG: [char; 5] = ['L', 'O', 'N', 'G', ' '];
+const COORD_LONG: &[u8; 5] = b"LONG ";
+//const COORD_LONG: [char; 5] = ['L', 'O', 'N', 'G', ' '];
 
 // GFSK mode parameters.
 // 1200 Baud => 0xB6D
@@ -494,18 +500,14 @@ mod app {
         // Getting position data
         let mut position = cx.shared.position;
 
-        let mut position_len = [b'0'; BUFFER_SIZE];
-        let mut position_long = [b'0'; BUFFER_SIZE];
-        let mut position_height = [b'0'; BUFFER_SIZE];
-
 
         // GNSS-------------------------------------------------------------------------------------
         let tx = cx.shared.gps_tx;
 
         // GNSS Get Position
         let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
-        //let _ = tx.bwrite_all(&packet);
-        //let _ = tx.flush();
+        let _ = tx.bwrite_all(&packet);
+        let _ = tx.flush();
 
         let mut rx_lock: bool = true;
 
@@ -519,41 +521,33 @@ mod app {
         */
         // GNSS Get Time (UTC)
         let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
-        _ = tx.bwrite_all(&packet_utc);
-        _ = tx.flush();
+        //_ = tx.bwrite_all(&packet_utc);
+        //_ = tx.flush();
 
-
-        let mut c_len: [char; 16] = ['.'; 16];
-        let mut c_long: [char; 16] = ['.'; 16];
-        let mut c_height: [char; 8] = ['.'; 8];
+        let mut position_len = [b'0'; BUFFER_SIZE];
+        let mut position_long = [b'0'; BUFFER_SIZE];
+        let mut position_height = [b'0'; BUFFER_SIZE];
 
         position.lock(|position| {
-            let c_cnt_len = lexical_core::write(position[0], &mut position_len);
-            let c_cnt_long = lexical_core::write(position[1], &mut position_long);
-            let c_position_height = lexical_core::write(position[2], &mut position_height);
-
-
-            for c in 0..15 {
-                c_len[c] = char::from(position_len[c]);
-            }
-            for c in 0..15 {
-                c_long[c] = char::from(position_long[c]);
-            }
-            for c in 0..7 {
-                c_height[c] = char::from(position_height[c]);
-            }
+            let _ = lexical_core::write(position[0], &mut position_len);
+            let _ = lexical_core::write(position[1], &mut position_long);
+            let _ = lexical_core::write(position[2], &mut position_height);
         });
+
+        let (f_len, _) = position_len.split_at_mut(15);
+        let (f_long, _) = position_long.split_at_mut(15);
+        let (f_height, _) = position_height.split_at_mut(15);
 
         // OOK / HELL
         #[cfg(feature = "hell")]
         {
-            fn tx_hell(txdt: &[char], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
+            fn tx_hell(txdt: &[u8], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
                 stm32f1xx_hal::spi::Spi2NoRemap,
                 (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
                 PC13<Output<PushPull>>>)
             {
                 for txchar in txdt {
-                    let h_symbol: u128 = hell::get_char(*txchar);
+                    let h_symbol: u128 = hell::get_char(char::from(*txchar));
                     let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
 
                     for txcnt in 0..16
@@ -574,16 +568,16 @@ mod app {
                 }
             }
 
-            tx_hell(&CALLSIGN, radio);
+            tx_hell(CALLSIGN, radio);
 
-            //tx_hell(&COORD_HEIGHT, radio);
-            //tx_hell(&c_height, radio);
+            tx_hell(COORD_HEIGHT, radio);
+            tx_hell(f_height, radio);
 
-            //tx_hell(&COORD_LEN, radio);
-            //tx_hell(&c_len, radio);
+            tx_hell(COORD_LEN, radio);
+            tx_hell(f_len, radio);
 
-            //tx_hell(&COORD_LONG, radio);
-            //tx_hell(&c_long, radio);
+            tx_hell(COORD_LONG, radio);
+            tx_hell(&f_long, radio);
 
             (utc_hour, utc_min, utc_sec).lock(|utc_hour, utc_min, utc_sec| {
                 hour = *utc_hour;
@@ -611,10 +605,11 @@ mod app {
                 c_sec[c] = char::from(p_sec[c]);
             }
 
+            /*
             tx_hell(&c_hour[0..2], radio);
             tx_hell(&c_min[0..2], radio);
             tx_hell(&c_sec[0..2], radio);
-
+            */
         }
 
 
