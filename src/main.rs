@@ -667,8 +667,6 @@ mod app {
     }
 
 
-
-
     // Receiving data from ublox isr ---------------------------------------------------------------
     #[task(priority = 3, binds = USART1, shared = [rx_buf, gps_rx_idle], local = [gps_rx, rxd_t1, st_det, payload_len, msg_cnt])]
     fn isr_gps(mut cx: isr_gps::Context) {
@@ -698,11 +696,6 @@ mod app {
                 if (!*start_detect) && (*rxd1 == 0xB5) && (rxd == 0x62) {
                     *start_detect = true;
 
-                    gps_rx_idle.lock(|gps_rx_idle| {
-                        *gps_rx_idle = false;
-                    }
-                    );
-
                     rx_buf.lock(|rx_buf| {
                         rx_buf.clear();
                         _ = rx_buf.push(0xB5);
@@ -730,13 +723,6 @@ mod app {
                         // Message complete
                         if *msg_cnt >= (*payload_len + 8) {
                             *start_detect = false;
-
-
-                            gps_rx_idle.lock(|gps_rx_idle| {
-                                *gps_rx_idle = true;
-                            }
-                            );
-
 
                             *msg_cnt = 0;
                             *payload_len = 0xFFF0;
