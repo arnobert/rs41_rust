@@ -103,6 +103,7 @@ pub const SPIMODE: Mode = Mode {
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5])]
 mod app {
+    use rtic::Mutex;
     use super::*;
 
     #[shared]
@@ -112,10 +113,7 @@ mod app {
         utc_hour: u8,
         utc_min: u8,
         utc_sec: u8,
-        #[lock_free]
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
-        //#[lock_free]
-        //gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
         gps_rx_idle: bool,
         rx_buf: Vec<u8, RX_BUF_SIZE>,
     }
@@ -455,6 +453,8 @@ mod app {
         blink_led::spawn().unwrap();
         cortex_m::asm::delay(10000000);
         read_adc::spawn().unwrap();
+        cortex_m::asm::delay(10000000);
+        tx::spawn().unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -470,18 +470,13 @@ mod app {
         }
     }
 
-    /*
-    #[task(shared = [led_g])]
-    fn toggle_led_g(cx: toggle_led_g::Context) {
-        cx.shared.led_g.toggle();
-    }
 
     // ---------------------------------------------------------------------------------------------
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
     #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr], shared = [position, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec])]
-    fn tx(cx: tx::Context) {
+    async fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
         let mut gps_rx_idle = cx.shared.gps_rx_idle;
 
@@ -498,15 +493,16 @@ mod app {
 
 
         // GNSS-------------------------------------------------------------------------------------
-        let tx = cx.shared.gps_tx;
+        let mut tx = cx.shared.gps_tx;
 
         // GNSS Get Position
         let packet = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
-        let _ = tx.bwrite_all(&packet);
-        let _ = tx.flush();
+        tx.lock(|tx| {
+            let _ = tx.bwrite_all(&packet);
+            let _ = tx.flush();
+        });
 
-        let mut rx_lock: bool = true;
-
+        //let mut rx_lock: bool = true;
         /*
         while rx_lock{
             gps_rx_idle.lock(|gps_rx_idle| {
@@ -515,6 +511,7 @@ mod app {
             cortex_m::asm::delay(1000);
         };
         */
+
         // GNSS Get Time (UTC)
         let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
         //_ = tx.bwrite_all(&packet_utc);
@@ -542,6 +539,7 @@ mod app {
                 (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
                 PC13<Output<PushPull>>>)
             {
+
                 for txchar in txdt {
                     let h_symbol: u128 = hell::get_char(char::from(*txchar));
                     let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
@@ -658,8 +656,9 @@ mod app {
                 radio.tx_on();
             }
         }
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
+        Systick::delay(1000.millis()).await;
     }
+
 
 
 
@@ -751,8 +750,8 @@ mod app {
         }
     }
 
-    #[task(shared = [position, rx_buf, utc_hour, utc_min, utc_sec])]
-    fn parse_gps_data(cx: parse_gps_data::Context) {
+    #[task(priority = 1, shared = [position, rx_buf, utc_hour, utc_min, utc_sec])]
+    async fn parse_gps_data(cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
 
@@ -812,41 +811,20 @@ mod app {
                 }
             }
         });
+        Systick::delay(1000.millis()).await;
         //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
     }
 
-    // ADC measurements ----------------------------------------------------------------------------
-    #[task(priority = 4, local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
-    fn read_adc(cx: read_adc::Context) {
-
-        let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
-        let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
-
-        if *cx.local.shutdown_next_cycle {
-            cx.local.shutdown.set_high();
-        }
-
-        if (vbat - pbut) < 100 {
-            *cx.local.shutdown_next_cycle = true;
-            //cx.shared.led_g.set_high();
-        }
-
-        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
-    }
 
     // TIM2 Tick -----------------------------------------------------------------------------------
-
     #[task(binds=TIM2, local = [timer_handler])]
     fn tim2_tick(cx: tim2_tick::Context) {
-        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(200)).unwrap();
-
         cx.local.timer_handler.clear_interrupt(Event::Update);
-
     }
 
     // Debug UART ----------------------------------------------------------------------------------
-    #[task(local = [dbg_tx], shared = [rx_buf])]
-    fn print_dbg(cx: print_dbg::Context) {
+    #[task(priority = 1, local = [dbg_tx], shared = [rx_buf])]
+    async fn print_dbg(cx: print_dbg::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let dbg_tx = cx.local.dbg_tx;
 
@@ -856,6 +834,7 @@ mod app {
                 _ = dbg_tx.write(*msx);
             }
         });
+        Systick::delay(1000.millis()).await;
     }
 
     #[task(binds = USART3, local = [dbg_rx])]
@@ -864,7 +843,7 @@ mod app {
         let rxb = rx.read();
         match rxb {
             Ok(_t) => {
-                toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
+                //toggle_led_g::spawn_after(Duration::<u64, 1, 1000>::from_ticks(10)).unwrap();
             }
             Err(e) => {
                 match e {
@@ -880,7 +859,7 @@ mod app {
 
 
 
-     */
+
 
     // ADC measurements ----------------------------------------------------------------------------
     #[task(priority = 1, shared = [led_g], local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
