@@ -7,7 +7,10 @@ mod hell;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 use panic_halt as _;
 
-use systick_monotonic::{fugit::Duration, Systick};
+use rtic::app;
+use rtic_monotonics::systick::Systick;
+
+
 use stm32f1xx_hal::{
     adc::*,
     gpio::{gpioa::*, gpiob::*, gpioc::*,
@@ -100,13 +103,10 @@ pub const SPIMODE: Mode = Mode {
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5])]
 mod app {
-    use rtic::Mutex;
-    use crate::app::shared_resources::utc_hour_that_needs_to_be_locked;
     use super::*;
 
     #[shared]
     struct Shared {
-        #[lock_free]
         led_g: PB7<Output<PushPull>>,
         position: [f64; 3],
         utc_hour: u8,
@@ -147,11 +147,9 @@ mod app {
         msg_cnt: u16,
     }
 
-    #[monotonic(binds = SysTick, default = true)]
-    type MonoTimer = Systick<1000>;
 
     #[init]
-    fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+    fn init(cx: init::Context) -> (Shared, Local) {
         /*
         fn init_profile(device: &pac::Peripherals) {
             // On development, keep the DBG module powered on during wfi()
@@ -169,7 +167,8 @@ mod app {
         let mut flash = cx.device.FLASH.constrain();
         let rcc = cx.device.RCC.constrain();
 
-        let mono = Systick::new(cx.core.SYST, 24_000_000);
+        let mono_token = rtic_monotonics::create_systick_token!();
+        let mono = Systick::start(cx.core.SYST, 24_000_000, mono_token);
         let clocks = rcc
             .cfgr
             .use_hse(24.MHz())
@@ -447,17 +446,15 @@ mod app {
                 payload_len: payloadlen,
                 msg_cnt: msg_cnt,
             },
-            init::Monotonics(mono),
         )
     }
 
 
     #[idle()]
     fn idle(_cx: idle::Context) -> ! {
-        read_adc::spawn_after(Duration::<u64, 1, 1000>::from_ticks(400)).unwrap();
-        tx::spawn_after(Duration::<u64, 1, 1000>::from_ticks(2500)).unwrap();
-
-
+        blink_led::spawn().unwrap();
+        cortex_m::asm::delay(10000000);
+        read_adc::spawn().unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -465,13 +462,15 @@ mod app {
         }
     }
 
-    #[task(local = [led_r])]
-    fn blink_led(cx: blink_led::Context) {
-        cx.local.led_r.toggle();
-        //blink_led::spawn_after(Duration::<u64, 1, 1000>::from_ticks(1000)).unwrap();
+    #[task(priority = 1, local = [led_r])]
+    async fn blink_led(cx: blink_led::Context) {
+        loop {
+            cx.local.led_r.toggle();
+            Systick::delay(1000.millis()).await;
+        }
     }
 
-
+    /*
     #[task(shared = [led_g])]
     fn toggle_led_g(cx: toggle_led_g::Context) {
         cx.shared.led_g.toggle();
@@ -878,4 +877,40 @@ mod app {
             }
         }
     }
+
+
+
+     */
+
+    // ADC measurements ----------------------------------------------------------------------------
+    #[task(priority = 1, shared = [led_g], local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
+    async fn read_adc(mut cx: read_adc::Context) {
+        loop {
+            let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
+            let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
+
+            if *cx.local.shutdown_next_cycle {
+                cx.local.shutdown.set_high();
+            }
+
+            if (vbat - pbut) < 100 {
+                Systick::delay(2000.millis()).await;
+                let vbat_z1: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
+                let pbut_z1: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
+
+                if (vbat_z1 - pbut_z1) < 100 {
+                    cx.shared.led_g.lock(|led_g|
+                    led_g.toggle()
+                    );
+                    Systick::delay(2000.millis()).await;
+                    cx.local.shutdown.set_high();
+                    //*cx.local.shutdown_next_cycle = true;
+                }
+            }
+
+            Systick::delay(1000.millis()).await;
+        }
+    }
+
+
 }
