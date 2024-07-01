@@ -676,7 +676,6 @@ mod app {
         }
 
         let rxb = rx.read();
-        let mut rx_complete: bool = false;
 
         match rxb {
             Ok(t) => {
@@ -713,16 +712,13 @@ mod app {
                         // Message complete
                         if *msg_cnt >= (*payload_len + 8) {
                             *start_detect = false;
-                            rx_complete = true;
                             *msg_cnt = 0;
                             *payload_len = 0xFFF0;
-                             //parse_gps_data::spawn().unwrap();
+                             parse_gps_data::spawn().unwrap();
                         }
                     });
                 }
-                if rx_complete {
-                    parse_gps_data::spawn().unwrap();
-                };
+
 
             }
             Err (e) => {
