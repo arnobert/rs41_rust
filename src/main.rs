@@ -4,6 +4,7 @@
 #[cfg(feature = "hell")]
 mod hell;
 
+use core::time::Duration;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 use panic_halt as _;
 
@@ -36,7 +37,6 @@ use lexical_core::BUFFER_SIZE;
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-//const CALLSIGN: [char; 11] = ['D', 'Q', '5', '0', 'R', 'U', 'B', ' ', 'W', 'X', ' '];
 const CALLSIGN: &[u8; 11] = b"DQ50RUB WX ";
 
 
@@ -44,9 +44,8 @@ const CALLSIGN: &[u8; 11] = b"DQ50RUB WX ";
 const CAR_FREQ: f32 = 432.2;
 
 
-
 // TX PERIOD [s]
-const TX_PERIOD: u8 = 30;
+const TX_PERIOD: u32 = 1;
 
 // TX power
 const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
@@ -647,7 +646,7 @@ mod app {
                     radio.tx_on();
                 }
             }
-            Systick::delay(1000.millis()).await;
+            Systick::delay(TX_PERIOD.secs()).await;
         }
 
 
