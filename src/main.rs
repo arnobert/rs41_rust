@@ -502,7 +502,7 @@ mod app {
         {
 
             for txchar in txdt {
-                let h_symbol: u128 = hell::get_char(char::from(*txchar));
+                let h_symbol: u128 = hell::get_char(*txchar);
                 let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
 
                 for txcnt in 0..16
