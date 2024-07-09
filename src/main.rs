@@ -495,12 +495,12 @@ mod app {
         // GNSS-------------------------------------------------------------------------------------
         let mut tx = cx.shared.gps_tx;
 
+        #[cfg(feature = "hell")]
         fn tx_hell(txdt: &[u8], tradio: &mut si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>), u8>,
             PC13<Output<PushPull>>>)
         {
-
             for txchar in txdt {
                 let h_symbol: u128 = hell::get_char(*txchar);
                 let h_bytes: [u8; 16] = h_symbol.to_be_bytes();
