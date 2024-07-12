@@ -276,7 +276,7 @@ mod app {
 
         //let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
 
-        // fRes temp boom: ~ 60 kHz @ room temp
+        // fRes temp boom: ~ 120 Hz @ room temp
 
         // TIMER -----------------------------------------------------------------------------------
 
