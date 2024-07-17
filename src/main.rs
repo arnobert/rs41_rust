@@ -19,11 +19,10 @@ use stm32f1xx_hal::{
            Output, PinState, PushPull},
     pac,
     prelude::*,
-    timer::{CounterMs, Event},
     serial::{Config, Serial},
     spi::*,
     timer::*,
-    timer::{pwm_input},
+    timer::{Timer, pwm_input},
 };
 
 use ublox::*;
@@ -100,9 +99,10 @@ pub const SPIMODE: Mode = Mode {
 
 // -------------------------------------------------------------------------------------------------
 
-#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5])]
+#[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5, TIM13])]
 mod app {
     use rtic::Mutex;
+    use stm32f1xx_hal::pac::DBGMCU;
     use super::*;
 
     #[shared]
@@ -121,8 +121,8 @@ mod app {
     struct Local {
         led_r: PB8<Output<PushPull>>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
-        timer_handler: CounterMs<pac::TIM2>,
-
+        //timer_handler: CounterMs<pac::TIM2>,
+        timer_ticks: u32,
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
@@ -274,22 +274,17 @@ mod app {
         let mut spdt_2 = pb4.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_3 = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
 
-        //let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
-
-        // fRes temp boom: ~ 120 Hz @ room temp
-
+        // fRes temp boom: ~ 63 kHz @ room temp
         // TIMER -----------------------------------------------------------------------------------
 
-        let mut timer = cx.device.TIM2.counter_ms(&clocks);
-        timer.start(1.secs()).unwrap();
-        timer.listen(Event::Update);
 
-        //let pwm_input = Timer::new(cx.device.TIM2, &clocks).pwm_input(
-        //    (gpioa.pa1),
-        //    &mut afio.mapr,
-        //    &mut dbg,
-        //    Configuration::Frequency(10.kHz()),
-        //);
+        let timer = Timer::new(cx.device.TIM2, &clocks).pwm_input::<Tim2NoRemap, (stm32f1xx_hal::gpio::Pin<'A', 0>, stm32f1xx_hal::gpio::Pin<'A', 1>)>(
+            (gpioa.pa0, gpioa.pa1),
+            &mut afio.mapr,
+            &mut dbg,
+            Configuration::Frequency(10.kHz())
+        );
+
 
         // State machine for UART receiver ---------------------------------------------------------
         let mut rxd1: u8 = 0;
@@ -426,7 +421,8 @@ mod app {
             Local {
                 gps_rx,
                 led_r: ledr,
-                timer_handler: timer,
+                //timer_handler: timer,
+                timer_ticks: 0,
                 radio_spi: radio,
                 freq_upper: F_C_UPPER,
                 freq_lower: F_C_LOWER,
@@ -451,9 +447,10 @@ mod app {
     fn idle(_cx: idle::Context) -> ! {
         blink_led::spawn().unwrap();
         cortex_m::asm::delay(10000000);
-        read_adc::spawn().unwrap();
+        //tim2_tick::spawn().unwrap();
+        //read_adc::spawn().unwrap();
         cortex_m::asm::delay(10000000);
-        tx::spawn().unwrap();
+        //tx::spawn().unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -793,11 +790,23 @@ mod app {
     }
 
 
-    // TIM2 Tick -----------------------------------------------------------------------------------
-    #[task(binds=TIM2, local = [timer_handler])]
-    fn tim2_tick(cx: tim2_tick::Context) {
-        cx.local.timer_handler.clear_interrupt(Event::Update);
+/*
+    // TIMER ISR -----------------------------------------------------------------------------------
+    //#[task(priority = 4, binds=TIM2, local = [timer_handler])]
+    #[task(priority = 3, local = [timer_handler, timer_ticks])]
+    async fn tim2_tick(cx: tim2_tick::Context) {
+        loop {
+            let mut x = cx.local.timer_handler.now();
+            *cx.local.timer_ticks = x.ticks();
+            cx.local.timer_handler.
+
+            cx.local.timer_handler.start(500.micros()).unwrap();
+            Systick::delay(1200.millis()).await;
+        }
+        //cx.local.timer_handler.clear_interrupt(Event::Update);
     }
+*/
+
 
     // Debug UART ----------------------------------------------------------------------------------
     #[task(priority = 1, local = [dbg_tx], shared = [rx_buf])]
