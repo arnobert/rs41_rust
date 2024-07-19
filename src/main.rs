@@ -10,7 +10,7 @@ use panic_halt as _;
 
 use rtic::app;
 use rtic_monotonics::systick::Systick;
-
+use rtt_target::{rtt_init_print, rprintln};
 
 use stm32f1xx_hal::{
     adc::*,
@@ -18,6 +18,7 @@ use stm32f1xx_hal::{
            Input, Alternate, Floating,
            Output, PinState, PushPull},
     pac,
+    pac::{tim2},
     prelude::*,
     serial::{Config, Serial},
     spi::*,
@@ -102,7 +103,7 @@ pub const SPIMODE: Mode = Mode {
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5, TIM13])]
 mod app {
     use rtic::Mutex;
-    use stm32f1xx_hal::pac::DBGMCU;
+    use stm32f1xx_hal::pac::{DBGMCU, TIM2};
     use super::*;
 
     #[shared]
@@ -121,7 +122,7 @@ mod app {
     struct Local {
         led_r: PB8<Output<PushPull>>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
-        //timer_handler: CounterMs<pac::TIM2>,
+        timer_handler: TIM2,
         timer_ticks: u32,
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
@@ -274,16 +275,19 @@ mod app {
         let mut spdt_2 = pb4.into_push_pull_output(&mut gpiob.crl);
         let mut spdt_3 = gpiob.pb5.into_push_pull_output(&mut gpiob.crl);
 
+        let mut meas_in = gpioa.pa1.into_floating_input(&mut gpioa.crl);
+
         // fRes temp boom: ~ 63 kHz @ room temp
         // TIMER -----------------------------------------------------------------------------------
+        let mut timer2 = cx.device.TIM2;
 
+        // Trigger
+        timer2.smcr.write(|w| w.ts().ti2fp2());
+        timer2.smcr.write(|w| w.sms().gated_mode());
 
-        let timer = Timer::new(cx.device.TIM2, &clocks).pwm_input::<Tim2NoRemap, (stm32f1xx_hal::gpio::Pin<'A', 0>, stm32f1xx_hal::gpio::Pin<'A', 1>)>(
-            (gpioa.pa0, gpioa.pa1),
-            &mut afio.mapr,
-            &mut dbg,
-            Configuration::Frequency(10.kHz())
-        );
+        timer2.arr.write(|w| w.arr().bits(0x42));
+        // Start timer
+        timer2.cr1.write(|w| w.cen().set_bit());
 
 
         // State machine for UART receiver ---------------------------------------------------------
@@ -421,7 +425,7 @@ mod app {
             Local {
                 gps_rx,
                 led_r: ledr,
-                //timer_handler: timer,
+                timer_handler: timer2,
                 timer_ticks: 0,
                 radio_spi: radio,
                 freq_upper: F_C_UPPER,
@@ -445,9 +449,11 @@ mod app {
 
     #[idle()]
     fn idle(_cx: idle::Context) -> ! {
+        rtt_init_print!();
+        rprintln!("Here we go");
         blink_led::spawn().unwrap();
         cortex_m::asm::delay(10000000);
-        //tim2_tick::spawn().unwrap();
+        tim2_tick::spawn().unwrap();
         //read_adc::spawn().unwrap();
         cortex_m::asm::delay(10000000);
         //tx::spawn().unwrap();
@@ -790,23 +796,30 @@ mod app {
     }
 
 
-/*
-    // TIMER ISR -----------------------------------------------------------------------------------
+
+    // Measure Temperature -------------------------------------------------------------------------
     //#[task(priority = 4, binds=TIM2, local = [timer_handler])]
+
     #[task(priority = 3, local = [timer_handler, timer_ticks])]
     async fn tim2_tick(cx: tim2_tick::Context) {
         loop {
-            let mut x = cx.local.timer_handler.now();
-            *cx.local.timer_ticks = x.ticks();
-            cx.local.timer_handler.
+            let x = cx.local.timer_handler.cnt.read();
+            *cx.local.timer_ticks = x.cnt().bits().into();
 
-            cx.local.timer_handler.start(500.micros()).unwrap();
+            rprintln!("{}", 0);
+
+            cx.local.timer_handler.cr1.write(|w| w.cen().set_bit());
             Systick::delay(1200.millis()).await;
         }
-        //cx.local.timer_handler.clear_interrupt(Event::Update);
     }
-*/
 
+    /*
+    #[task(priority = 4, binds=TIM2, local = [timer_handler])]
+    fn tim2_isr(cx: tim2_isr::Context) {
+        Systick::delay(1200.millis());
+    }
+
+     */
 
     // Debug UART ----------------------------------------------------------------------------------
     #[task(priority = 1, local = [dbg_tx], shared = [rx_buf])]
