@@ -123,7 +123,7 @@ mod app {
     struct Local {
         led_r: PB8<Output<PushPull>>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
-        timer_handler: CounterUs<TIM2>,
+        timer_handler: TIM2,
         timer_ticks: u32,
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
@@ -165,6 +165,7 @@ mod app {
 
         // Peripherals -----------------------------------------------------------------------------
         let mut flash = cx.device.FLASH.constrain();
+        cx.device.RCC.apb1enr.modify(|r, w| w.tim2en().enabled());
         let rcc = cx.device.RCC.constrain();
 
         let mono_token = rtic_monotonics::create_systick_token!();
@@ -281,14 +282,14 @@ mod app {
 
         // fRes temp boom: ~ 63 kHz @ room temp
         // TIMER -----------------------------------------------------------------------------------
-        let mut timer2: Counter<TIM2, 1_000_000> = cx.device.TIM2.counter(&clocks).into();
-
-        // Trigger
-        //timer2.smcr.write(|w| w.ts().ti2fp2());
-        //timer2.smcr.write(|w| w.sms().gated_mode());
+        //let mut timer2: Counter<TIM2, 1_000_000> = cx.device.TIM2.counter(&clocks).into();
+        let mut timer2 = cx.device.TIM2;
 
         // Start timer
-        //timer2.cr1.write(|w| w.cen().set_bit());
+        timer2.cr1.modify(|r, w| w.cen().enabled());
+        // Trigger
+        timer2.smcr.modify(|r, w| w.ts().ti2fp2());
+        timer2.smcr.modify(|r, w| { w.sms().ext_clock_mode() });
 
 
         // State machine for UART receiver ---------------------------------------------------------
@@ -799,19 +800,26 @@ mod app {
 
 
 
+
     // Measure Temperature -------------------------------------------------------------------------
     #[task(priority = 3, local = [timer_handler, timer_ticks, gpio_temp])]
     async fn tim2_tick(cx: tim2_tick::Context) {
         loop {
-            let p = &mut *cx.local.gpio_temp;
+            //let p = &mut *cx.local.gpio_temp;
+            //while(p.is_high()) {};
+            //while(p.is_low()) {};
+            //cx.local.timer_handler.start(10.millis()).unwrap();
+            //while(p.is_high()) {};
+            //let freq = cx.local.timer_handler.now().ticks();
+            //cx.local.timer_handler.cancel().unwrap();
 
-            while(p.is_high()) {};
-            while(p.is_low()) {};
-            cx.local.timer_handler.start(10.millis()).unwrap();
-            while(p.is_high()) {};
-            let freq = cx.local.timer_handler.now().ticks();
-            cx.local.timer_handler.cancel().unwrap();
-            rprintln!("{}", freq);
+            let mut timer2 = &cx.local.timer_handler;
+            let mut cnt_reg = &timer2.cnt;
+            let x = cnt_reg.read().cnt().bits();
+            timer2.cnt.write(|w| w.cnt().bits(0));
+
+            rprintln!("{}", x);
+
 
             Systick::delay(1200.millis()).await;
         }
