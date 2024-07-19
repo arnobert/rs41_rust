@@ -102,6 +102,7 @@ pub const SPIMODE: Mode = Mode {
 
 #[rtic::app(device = stm32f1xx_hal::pac, peripherals = true, dispatchers = [TIM3, TIM4, TIM5, TIM13])]
 mod app {
+    use core::ops::Deref;
     use rtic::Mutex;
     use stm32f1xx_hal::pac::{DBGMCU, TIM2};
     use super::*;
@@ -122,7 +123,7 @@ mod app {
     struct Local {
         led_r: PB8<Output<PushPull>>,
         gps_rx: stm32f1xx_hal::serial::Rx<USART1>,
-        timer_handler: TIM2,
+        timer_handler: CounterUs<TIM2>,
         timer_ticks: u32,
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
             stm32f1xx_hal::spi::Spi2NoRemap,
@@ -143,6 +144,7 @@ mod app {
         st_det: bool,
         payload_len: u16,
         msg_cnt: u16,
+        gpio_temp: stm32f1xx_hal::gpio::Pin<'A', 1>
     }
 
 
@@ -279,15 +281,14 @@ mod app {
 
         // fRes temp boom: ~ 63 kHz @ room temp
         // TIMER -----------------------------------------------------------------------------------
-        let mut timer2 = cx.device.TIM2;
+        let mut timer2: Counter<TIM2, 1_000_000> = cx.device.TIM2.counter(&clocks).into();
 
         // Trigger
-        timer2.smcr.write(|w| w.ts().ti2fp2());
-        timer2.smcr.write(|w| w.sms().gated_mode());
+        //timer2.smcr.write(|w| w.ts().ti2fp2());
+        //timer2.smcr.write(|w| w.sms().gated_mode());
 
-        timer2.arr.write(|w| w.arr().bits(0x42));
         // Start timer
-        timer2.cr1.write(|w| w.cen().set_bit());
+        //timer2.cr1.write(|w| w.cen().set_bit());
 
 
         // State machine for UART receiver ---------------------------------------------------------
@@ -442,6 +443,7 @@ mod app {
                 st_det: stdet,
                 payload_len: payloadlen,
                 msg_cnt: msg_cnt,
+                gpio_temp: meas_in,
             },
         )
     }
@@ -798,28 +800,23 @@ mod app {
 
 
     // Measure Temperature -------------------------------------------------------------------------
-    //#[task(priority = 4, binds=TIM2, local = [timer_handler])]
-
-    #[task(priority = 3, local = [timer_handler, timer_ticks])]
+    #[task(priority = 3, local = [timer_handler, timer_ticks, gpio_temp])]
     async fn tim2_tick(cx: tim2_tick::Context) {
         loop {
-            let x = cx.local.timer_handler.cnt.read();
-            *cx.local.timer_ticks = x.cnt().bits().into();
+            let p = &mut *cx.local.gpio_temp;
 
-            rprintln!("{}", 0);
+            while(p.is_high()) {};
+            while(p.is_low()) {};
+            cx.local.timer_handler.start(10.millis()).unwrap();
+            while(p.is_high()) {};
+            let freq = cx.local.timer_handler.now().ticks();
+            cx.local.timer_handler.cancel().unwrap();
+            rprintln!("{}", freq);
 
-            cx.local.timer_handler.cr1.write(|w| w.cen().set_bit());
             Systick::delay(1200.millis()).await;
         }
     }
 
-    /*
-    #[task(priority = 4, binds=TIM2, local = [timer_handler])]
-    fn tim2_isr(cx: tim2_isr::Context) {
-        Systick::delay(1200.millis());
-    }
-
-     */
 
     // Debug UART ----------------------------------------------------------------------------------
     #[task(priority = 1, local = [dbg_tx], shared = [rx_buf])]
