@@ -374,8 +374,8 @@ mod app {
 
 
         // Config for GFSK mode ----------------------------------------------------------------
-        #[cfg(not(any(feature = "hell")))]
-        {
+        //#[cfg(not(any(feature = "hell")))]
+        //{
             radio.set_modulation_type(si4032_driver::ModType::GFSK);
             radio.set_freq_deviation(0x0A);
             //radio.set_freq_offset(0x002);
@@ -402,12 +402,12 @@ mod app {
 
 
             // Packet Length
-            radio.set_packet_len(16);
+            radio.set_packet_len(20);
             radio.set_tx_fixplen(false);
 
             // CRC
             //radio.set_crc(false);
-        }
+        //}
 
         radio.enter_tx();
 
@@ -456,10 +456,10 @@ mod app {
         rprintln!("Here we go");
         blink_led::spawn().unwrap();
         cortex_m::asm::delay(10000000);
-        tim2_tick::spawn().unwrap();
+        //tim2_tick::spawn().unwrap();
         //read_adc::spawn().unwrap();
         cortex_m::asm::delay(10000000);
-        //tx::spawn().unwrap();
+        tx::spawn().unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
@@ -604,8 +604,8 @@ mod app {
 
 
             // GFSK
-            #[cfg(not(any(feature = "hell")))]
-            {
+            //#[cfg(not(any(feature = "hell")))]
+            //{
                 // --------------------------------
                 // HORUS V2 16 Byte Format:
                 // ---------------------------------------------------
@@ -651,7 +651,7 @@ mod app {
                 if !radio.is_tx_on() {
                     radio.tx_on();
                 }
-            }
+            //}
             Systick::delay(TX_PERIOD.secs()).await;
         }
 
