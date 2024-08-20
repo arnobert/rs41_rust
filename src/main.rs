@@ -88,7 +88,8 @@ const COORD_LONG: &[u8; 5] = b"LONG ";
 
 // GFSK mode parameters.
 // 1200 Baud => 0xB6D
-const GFSK_DATA_RATE: u16 = 0xB6D;
+//const GFSK_DATA_RATE: u16 = 0x1D4D;
+const GFSK_DATA_RATE: u16 = 0x0EA6;
 // -------------------------------------------------------------------------------------------------
 
 const RX_BUF_SIZE: usize = 128;
@@ -376,9 +377,9 @@ mod app {
         // Config for GFSK mode ----------------------------------------------------------------
         //#[cfg(not(any(feature = "hell")))]
         //{
-            radio.set_modulation_type(si4032_driver::ModType::GFSK);
-            radio.set_freq_deviation(0x0A);
-            //radio.set_freq_offset(0x002);
+            radio.set_man_en(true);
+            radio.set_modulation_type(si4032_driver::ModType::FSK);
+            radio.set_freq_deviation(0x05);
             radio.set_trxdrtscale(true);
             radio.set_data_rate(GFSK_DATA_RATE);
 
@@ -386,10 +387,9 @@ mod app {
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             // Preamble
-            radio.set_tx_prealen(0x0E);
+            radio.set_tx_prealen(0x0F);
 
             // Sync Word
-            // F8D8 = 11100110 11011000
             radio.set_sync_wrd(0x4242 << 16);
 
             // 00 -> Sync Word 3
@@ -401,8 +401,9 @@ mod app {
             radio.set_tx_header_len(0);
 
 
+
             // Packet Length
-            radio.set_packet_len(20);
+            radio.set_packet_len(0x14);
             radio.set_tx_fixplen(false);
 
             // CRC
