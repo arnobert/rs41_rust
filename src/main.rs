@@ -369,8 +369,8 @@ mod app {
 
 
         // Config for GFSK mode ----------------------------------------------------------------
-        //#[cfg(not(any(feature = "hell")))]
-        //{
+        #[cfg(not(any(feature = "hell")))]
+        {
             // Reference Heat
             radio.set_gpio_1(false);
 
@@ -387,7 +387,7 @@ mod app {
             radio.set_tx_prealen(0x0F);
 
             // Sync Word
-            radio.set_sync_wrd(0x4242 << 16);
+            radio.set_sync_wrd(0x1798 << 16);
 
             // 00 -> Sync Word 3
             // 01 -> Sync Word 3, 2
@@ -397,23 +397,22 @@ mod app {
             // TX Header
             radio.set_tx_header_len(0);
 
-
+            // CRC
+            radio.set_crc_en(true);
+            radio.set_crc_d_only(true);
 
             // Packet Length
-            radio.set_packet_len(0x14);
+            radio.set_packet_len(14);
             radio.set_tx_fixplen(false);
-
-            // CRC
-            //radio.set_crc(false);
-        //}
+        }
 
         radio.enter_tx();
 
         // End init --------------------------------------------------------------------------------
         (
             Shared {
-                position: [0.0, 0.0, 0.0],
-                position_raw: [0, 0, 0],
+                position: [0.0; 3],
+                position_raw: [0; 3],
                 utc_hour: 0,
                 utc_min: 0,
                 utc_sec: 0,
@@ -455,15 +454,15 @@ mod app {
     fn idle(_cx: idle::Context) -> ! {
         rtt_init_print!();
         blink_led::spawn().unwrap();
-        cortex_m::asm::delay(10000000);
+        cortex_m::asm::delay(10_000_000);
         //tim2_tick::spawn().unwrap();
-        read_adc::spawn().unwrap();
-        cortex_m::asm::delay(10000000);
+        //read_adc::spawn().unwrap();
+        cortex_m::asm::delay(10_000_000);
         tx::spawn().unwrap();
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
-            cortex_m::asm::delay(10000);
+            cortex_m::asm::delay(10_000);
         }
     }
 
@@ -471,7 +470,7 @@ mod app {
     async fn blink_led(cx: blink_led::Context) {
         loop {
             cx.local.led_r.toggle();
-            Systick::delay(1000.millis()).await;
+            Systick::delay(1_000.millis()).await;
         }
     }
 
@@ -541,7 +540,7 @@ mod app {
             tx.lock(|tx| {
                 let _ = tx.bwrite_all(&packet_pos);
                 cortex_m::asm::delay(10000000);
-                let _ = tx.bwrite_all(&packet_utc);
+                //let _ = tx.bwrite_all(&packet_utc);
                 let _ = tx.flush();
             });
 
@@ -651,9 +650,8 @@ mod app {
 
 
                 let flag_byte: [u8; 1] = [0xFF];
-                let crc: [u8; 2] = [0x56, 0x57];
 
-
+                // --- PACKET ASSEMBLY ------------
                 radio.write_fifo(&[0x42]);
                 radio.write_fifo(&[*packet_cnt]);
                 radio.write_fifo(&[0x00, sec]);
@@ -668,11 +666,11 @@ mod app {
                 radio.write_fifo(&bat_volt);
                 radio.write_fifo(&flag_byte);
 
-                *packet_cnt = (*packet_cnt % 255) + 1;
-
                 if !radio.is_tx_on() {
                     radio.tx_on();
                 }
+
+                *packet_cnt = (*packet_cnt % 255) + 1;
             }
             Systick::delay(TX_PERIOD.secs()).await;
         }
@@ -795,7 +793,7 @@ mod app {
                                     position_raw[1] = pack.lon_degrees_raw();
                                     position_raw[2] = pack.height_msl_raw();
 
-                                    rprintln!("LAT: {}", pack.lat_degrees_raw() & (0xFFFFFF00u32 as i32));
+                                    rprintln!("LAT: {}", pack.lat_degrees_raw());
                                     rprintln!("LONG: {}", pack.lon_degrees_raw());
                                     rprintln!("HEIGHT: {}", pack.height_msl_raw());
 
@@ -929,6 +927,4 @@ mod app {
             Systick::delay(1000.millis()).await;
         }
     }
-
-
 }
