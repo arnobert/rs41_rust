@@ -489,10 +489,6 @@ mod app {
         let mut utc_min = cx.shared.utc_min;
         let mut utc_sec = cx.shared.utc_sec;
 
-        let mut hour: u8 = 0;
-        let mut min: u8 = 0;
-        let mut sec: u8 = 0;
-
         // Getting position data
         let mut position = cx.shared.position;
         let mut position_raw = cx.shared.position_raw;
@@ -610,13 +606,13 @@ mod app {
             #[cfg(not(any(feature = "hell")))]
             {
                 // --------------------------------
-                // HORUS V2 16 Byte Format:
+                // HORUS V2 16 Byte Format, modified
                 // ---------------------------------------------------
                 // BYTE NUM | SITE (BYTES) | DATA TYPE | Description
                 // ---------------------------------------------------
-                //    0     |       1      |  uint8    | Payload ID
+                //    0     |       1      |  uint8    | Payload ID -> 0x42
                 //    1     |       1      |  uint8    | Sequence No
-                //    2     |       2      |  uint16   | Secs in day / 2
+                //    2     |       2      |  uint16   | Seconds of UTC
                 //    4     |       3      |  Q9.15    | Latitude
                 //    7     |       3      |  Q9.15    | Longitude
                 //    10    |       2      |  uint16   | Height (m)
@@ -624,12 +620,14 @@ mod app {
                 //    13    |       1      |  uint8    | Flags Byte
                 //    14    |       2      |  uint16   | CRC
 
-                let payload_id: [u8; 1] = [0x42];
-                let secs_day_2: [u8; 2] = [0x00, 0x01];
+                let mut sec: u8 = 0;
+                utc_sec.lock(|utc_sec| {
+                    sec = *utc_sec;
+                });
 
-                let mut lat: [u8; 3] = [0x03, 0x04, 0x05];
-                let mut long: [u8; 3] = [0x06, 0x07, 0x08];
-                let mut height: [u8; 2] = [0x09, 0x0A];
+                let mut lat: [u8; 3] = [0x0; 3];
+                let mut long: [u8; 3] = [0x0; 3];
+                let mut height: [u8; 2] = [0x0; 2];
 
                 position_raw.lock(|position_raw| {
                     lat[0] = (position_raw[0] >> 24 & 0xFF) as u8;
@@ -656,9 +654,9 @@ mod app {
                 let crc: [u8; 2] = [0x56, 0x57];
 
 
-                radio.write_fifo(&payload_id);
-                //radio.write_fifo(&[*packet_cnt]);
-                radio.write_fifo(&secs_day_2);
+                radio.write_fifo(&[0x42]);
+                radio.write_fifo(&[*packet_cnt]);
+                radio.write_fifo(&[0x00, sec]);
                 radio.write_fifo(&[lat[0]]);
                 radio.write_fifo(&[lat[1]]);
                 radio.write_fifo(&[lat[2]]);
@@ -669,8 +667,6 @@ mod app {
                 radio.write_fifo(&[height[1]]);
                 radio.write_fifo(&bat_volt);
                 radio.write_fifo(&flag_byte);
-                radio.write_fifo(&[crc[0]]);
-                radio.write_fifo(&[crc[1]]);
 
                 *packet_cnt = (*packet_cnt % 255) + 1;
 
