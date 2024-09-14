@@ -751,7 +751,6 @@ mod app {
         let mut utc_min = cx.shared.utc_min;
         let mut utc_sec = cx.shared.utc_sec;
 
-
         // Local buffer
         let mut pbuf: Vec<u8, RX_BUF_SIZE> = Vec::new();
 
