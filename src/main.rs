@@ -146,7 +146,8 @@ mod app {
         st_det: bool,
         payload_len: u16,
         msg_cnt: u16,
-        gpio_temp: stm32f1xx_hal::gpio::Pin<'A', 1>
+        gpio_temp: stm32f1xx_hal::gpio::Pin<'A', 1>,
+        packet_cnt: u8
     }
 
 
@@ -451,6 +452,7 @@ mod app {
                 payload_len: payloadlen,
                 msg_cnt: msg_cnt,
                 gpio_temp: meas_in,
+                packet_cnt: 0,
             },
         )
     }
@@ -486,7 +488,7 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec])]
+    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr, packet_cnt], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec])]
     async fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
         let mut gps_rx_idle = cx.shared.gps_rx_idle;
@@ -503,6 +505,8 @@ mod app {
         // Getting position data
         let mut position = cx.shared.position;
         let mut position_raw = cx.shared.position_raw;
+
+        let mut packet_cnt = cx.local.packet_cnt;
 
 
         // GNSS-------------------------------------------------------------------------------------
@@ -629,7 +633,6 @@ mod app {
                 //    14    |       2      |  uint16   | CRC
 
                 let payload_id: [u8; 1] = [0x42];
-                let sequence_no: [u8; 1] = [0x23];
                 let secs_day_2: [u8; 2] = [0x00, 0x01];
 
                 let mut lat: [u8; 3] = [0x03, 0x04, 0x05];
@@ -656,7 +659,7 @@ mod app {
 
 
                 radio.write_fifo(&payload_id);
-                radio.write_fifo(&sequence_no);
+                //radio.write_fifo(&[*packet_cnt]);
                 radio.write_fifo(&secs_day_2);
                 radio.write_fifo(&[lat[0]]);
                 radio.write_fifo(&[lat[1]]);
@@ -670,6 +673,9 @@ mod app {
                 radio.write_fifo(&flag_byte);
                 radio.write_fifo(&[crc[0]]);
                 radio.write_fifo(&[crc[1]]);
+
+                *packet_cnt = (*packet_cnt % 255) + 1;
+                rprintln!("CNT: {}", *packet_cnt);
 
                 if !radio.is_tx_on() {
                     radio.tx_on();
