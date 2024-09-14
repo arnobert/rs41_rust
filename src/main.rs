@@ -803,11 +803,6 @@ mod app {
                                     *utc_sec = pack.sec();
                                     rprintln!("SEC: {} ", utc_sec);
                                 });
-
-
-
-                                let m = pack.hour() + pack.min();
-
                             }
                             _ => {}
                         };
