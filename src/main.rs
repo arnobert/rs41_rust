@@ -315,7 +315,7 @@ mod app {
         // Set Dynamic model: Airborne <2g
         let model_packet = CfgNav5Builder {
             mask: CfgNav5Params::DYN,
-            dyn_model: CfgNav5DynModel::AirborneWith4gAcceleration,
+            dyn_model: CfgNav5DynModel::AirborneWithLess1gAcceleration,
             fix_mode: CfgNav5FixMode::default(),
             fixed_alt: 0.0,
             fixed_alt_var: 0.0,
@@ -397,13 +397,17 @@ mod app {
             // TX Header
             radio.set_tx_header_len(0);
 
-            // CRC
-            radio.set_crc_en(true);
-            radio.set_crc_d_only(true);
-
             // Packet Length
             radio.set_packet_len(14);
             radio.set_tx_fixplen(false);
+
+            // CRC
+            radio.set_enpac(true);
+            radio.set_crc_en(true);
+            //radio.set_crc_d_only(true);
+            radio.set_crc_poly(si4032_driver::CrcPoly::Biacheva);
+
+
         }
 
         radio.enter_tx();
@@ -456,7 +460,7 @@ mod app {
         blink_led::spawn().unwrap();
         cortex_m::asm::delay(10_000_000);
         //tim2_tick::spawn().unwrap();
-        //read_adc::spawn().unwrap();
+        read_adc::spawn().unwrap();
         cortex_m::asm::delay(10_000_000);
         tx::spawn().unwrap();
         loop {
@@ -539,8 +543,8 @@ mod app {
 
             tx.lock(|tx| {
                 let _ = tx.bwrite_all(&packet_pos);
-                cortex_m::asm::delay(10000000);
-                //let _ = tx.bwrite_all(&packet_utc);
+                let _ = tx.flush();
+                let _ = tx.bwrite_all(&packet_utc);
                 let _ = tx.flush();
             });
 
@@ -649,8 +653,9 @@ mod app {
                 });
 
 
-                let flag_byte: [u8; 1] = [0xFF];
+                let flag_byte: [u8; 1] = [0xAF];
 
+                radio.tx_on();
                 // --- PACKET ASSEMBLY ------------
                 radio.write_fifo(&[0x42]);
                 radio.write_fifo(&[*packet_cnt]);
@@ -666,9 +671,9 @@ mod app {
                 radio.write_fifo(&bat_volt);
                 radio.write_fifo(&flag_byte);
 
-                if !radio.is_tx_on() {
-                    radio.tx_on();
-                }
+                //if !radio.is_tx_on() {
+                //    radio.tx_on();
+                //}
 
                 *packet_cnt = (*packet_cnt % 255) + 1;
             }
