@@ -461,11 +461,10 @@ mod app {
     #[idle()]
     fn idle(_cx: idle::Context) -> ! {
         rtt_init_print!();
-        rprintln!("Here we go");
         blink_led::spawn().unwrap();
         cortex_m::asm::delay(10000000);
         //tim2_tick::spawn().unwrap();
-        //read_adc::spawn().unwrap();
+        read_adc::spawn().unwrap();
         cortex_m::asm::delay(10000000);
         tx::spawn().unwrap();
         loop {
@@ -675,7 +674,6 @@ mod app {
                 radio.write_fifo(&[crc[1]]);
 
                 *packet_cnt = (*packet_cnt % 255) + 1;
-                rprintln!("CNT: {}", *packet_cnt);
 
                 if !radio.is_tx_on() {
                     radio.tx_on();
@@ -689,7 +687,7 @@ mod app {
 
 
     // Receiving data from ublox isr ---------------------------------------------------------------
-    #[task(priority = 3, binds = USART1, shared = [rx_buf, gps_rx_idle], local = [gps_rx, rxd_t1, st_det, payload_len, msg_cnt])]
+    #[task(priority = 4, binds = USART1, shared = [rx_buf, gps_rx_idle], local = [gps_rx, rxd_t1, st_det, payload_len, msg_cnt])]
     fn isr_gps(mut cx: isr_gps::Context) {
         //let rx = cx.shared.gps_rx;
         let rx = cx.local.gps_rx;
@@ -765,7 +763,7 @@ mod app {
         }
     }
 
-    #[task(priority = 4, shared = [position, position_raw, rx_buf, utc_hour, utc_min, utc_sec])]
+    #[task(priority = 2, shared = [position, position_raw, rx_buf, utc_hour, utc_min, utc_sec])]
     async fn parse_gps_data(cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
@@ -813,17 +811,17 @@ mod app {
 
                                 utc_hour.lock(|utc_hour| {
                                     *utc_hour = pack.hour();
-                                    rprintln!("HOUR: {} ", utc_hour);
+                                    //rprintln!("HOUR: {} ", utc_hour);
                                 });
 
                                 utc_min.lock(|utc_min| {
                                     *utc_min = pack.min();
-                                    rprintln!("MIN: {} ", utc_min);
+                                    //rprintln!("MIN: {} ", utc_min);
                                 });
 
                                 utc_sec.lock(|utc_sec| {
                                     *utc_sec = pack.sec();
-                                    rprintln!("SEC: {} ", utc_sec);
+                                    //rprintln!("SEC: {} ", utc_sec);
                                 });
                             }
                             _ => {}
@@ -848,26 +846,15 @@ mod app {
     #[task(priority = 3, local = [timer_handler, timer_ticks, gpio_temp])]
     async fn tim2_tick(cx: tim2_tick::Context) {
         loop {
-            //let p = &mut *cx.local.gpio_temp;
-            //while(p.is_high()) {};
-            //while(p.is_low()) {};
-            //cx.local.timer_handler.start(10.millis()).unwrap();
-            //while(p.is_high()) {};
-            //let freq = cx.local.timer_handler.now().ticks();
-            //cx.local.timer_handler.cancel().unwrap();
-
             let mut timer2 = &cx.local.timer_handler;
             let mut cnt_reg = &timer2.cnt;
             let x = cnt_reg.read().cnt().bits();
             timer2.cnt.write(|w| w.cnt().bits(0));
-
-            rprintln!("{}", x);
-
-
             Systick::delay(1200.millis()).await;
         }
     }
 
+    /*
 
     // Debug UART ----------------------------------------------------------------------------------
     #[task(priority = 1, local = [dbg_tx], shared = [rx_buf])]
@@ -903,7 +890,7 @@ mod app {
             }
         }
     }
-
+    */
 
 
 
@@ -913,6 +900,11 @@ mod app {
     async fn read_adc(mut cx: read_adc::Context) {
         loop {
             let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
+
+            //Too large for mem
+            //let mut vbat_v: f64 = (vbat as f64) * 0.00143 + 0.08;
+            //rprintln!("BAT VOLT: {}", vbat_v);
+
             let pbut: u16 = cx.local.adc_1.read(cx.local.adc_ch_1).unwrap();
 
             if *cx.local.shutdown_next_cycle {
@@ -930,7 +922,6 @@ mod app {
                     );
                     Systick::delay(2000.millis()).await;
                     cx.local.shutdown.set_high();
-                    //*cx.local.shutdown_next_cycle = true;
                 }
             }
 
