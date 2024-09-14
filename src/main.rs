@@ -112,6 +112,7 @@ mod app {
     struct Shared {
         led_g: PB7<Output<PushPull>>,
         position: [f64; 3],
+        position_raw: [i32; 3],
         utc_hour: u8,
         utc_min: u8,
         utc_sec: u8,
@@ -377,6 +378,9 @@ mod app {
         // Config for GFSK mode ----------------------------------------------------------------
         //#[cfg(not(any(feature = "hell")))]
         //{
+            // Reference Heat
+            radio.set_gpio_1(false);
+
             radio.set_man_en(true);
             radio.set_modulation_type(si4032_driver::ModType::FSK);
             radio.set_freq_deviation(0x05);
@@ -416,6 +420,7 @@ mod app {
         (
             Shared {
                 position: [0.0, 0.0, 0.0],
+                position_raw: [0, 0, 0],
                 utc_hour: 0,
                 utc_min: 0,
                 utc_sec: 0,
@@ -737,10 +742,11 @@ mod app {
         }
     }
 
-    #[task(priority = 4, shared = [position, rx_buf, utc_hour, utc_min, utc_sec])]
+    #[task(priority = 4, shared = [position, position_raw, rx_buf, utc_hour, utc_min, utc_sec])]
     async fn parse_gps_data(cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
+        let mut position_raw = cx.shared.position_raw;
         let mut utc_hour = cx.shared.utc_hour;
         let mut utc_min = cx.shared.utc_min;
         let mut utc_sec = cx.shared.utc_sec;
@@ -765,21 +771,32 @@ mod app {
                                     position[1] = pack.lon_degrees();
                                     position[2] = pack.height_msl();
                                 });
+
+                                position_raw.lock(|position_raw| {
+                                    position_raw[0] = pack.lat_degrees_raw();
+                                    position_raw[1] = pack.lon_degrees_raw();
+                                    position_raw[2] = pack.height_msl_raw();
+                                });
                             }
 
                             PacketRef::NavTimeUTC(pack) => {
 
                                 utc_hour.lock(|utc_hour| {
                                     *utc_hour = pack.hour();
+                                    //rprintln!("HOUR: {} ", utc_hour);
                                 });
 
                                 utc_min.lock(|utc_min| {
                                     *utc_min = pack.min();
+                                    //rprintln!("MIN: {} ", utc_min);
                                 });
 
                                 utc_sec.lock(|utc_sec| {
                                     *utc_sec = pack.sec();
+                                    //rprintln!("SEC: {} ", utc_sec);
                                 });
+
+
 
                                 let m = pack.hour() + pack.min();
 
