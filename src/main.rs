@@ -4,11 +4,9 @@
 #[cfg(feature = "hell")]
 mod hell;
 
-use core::time::Duration;
 use embedded_hal::spi::{Mode, Phase, Polarity};
 use panic_halt as _;
 
-use rtic::app;
 use rtic_monotonics::systick::Systick;
 use rtt_target::{rtt_init_print, rprintln};
 
@@ -17,13 +15,10 @@ use stm32f1xx_hal::{
     gpio::{gpioa::*, gpiob::*, gpioc::*,
            Input, Alternate, Floating,
            Output, PinState, PushPull},
-    pac,
-    pac::{tim2},
     prelude::*,
     serial::{Config, Serial},
     spi::*,
     timer::*,
-    timer::{Timer, pwm_input},
 };
 
 use ublox::*;
@@ -116,6 +111,7 @@ mod app {
         utc_hour: u8,
         utc_min: u8,
         utc_sec: u8,
+        vbat: u16,
         gps_tx: stm32f1xx_hal::serial::Tx<USART1>,
         gps_rx_idle: bool,
         rx_buf: Vec<u8, RX_BUF_SIZE>,
@@ -128,7 +124,7 @@ mod app {
         timer_handler: TIM2,
         timer_ticks: u32,
         radio_spi: si4032_driver::Si4032<Spi<stm32f1xx_hal::pac::SPI2,
-            stm32f1xx_hal::spi::Spi2NoRemap,
+            Spi2NoRemap,
             (PB13<Alternate<PushPull>>, PB14, PB15<Alternate<PushPull>>),
             u8>,
             PC13<Output<PushPull>>>,
@@ -137,7 +133,7 @@ mod app {
         txpwr: ETxPower,
         adc_ch_0: PA5<Analog>,
         adc_ch_1: PA6<Analog>,
-        adc_1: stm32f1xx_hal::adc::Adc<ADC1>,
+        adc_1: Adc<ADC1>,
         shutdown: PA12<Output<PushPull>>,
         shutdown_next_cycle: bool,
         dbg_tx: stm32f1xx_hal::serial::Tx<USART3>,
@@ -185,10 +181,6 @@ mod app {
         let mut gpioa = cx.device.GPIOA.split();
         let mut gpiob = cx.device.GPIOB.split();
         let mut gpioc = cx.device.GPIOC.split();
-
-        /*
-        let channels = cx.device.DMA1.split();
-        */
 
         // Disable JTAG ----------------------------------------------------------------------------
         let (mut pa15, pb3, pb4) = afio.mapr.disable_jtag(gpioa.pa15, gpiob.pb3, gpiob.pb4);
@@ -425,6 +417,7 @@ mod app {
                 utc_hour: 0,
                 utc_min: 0,
                 utc_sec: 0,
+                vbat: 0,
                 led_g: ledg,
                 gps_tx,
                 //gps_rx,
@@ -470,7 +463,7 @@ mod app {
         loop {
             // DO NOT UNCOMMENT UNLESS YOU WANT TO LIFT THE BOOT0 PIN
             //cortex_m::asm::wfi();
-            cortex_m::asm::delay(100);
+            cortex_m::asm::delay(10000);
         }
     }
 
@@ -487,11 +480,10 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr, packet_cnt], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec])]
+    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr, packet_cnt], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec, vbat])]
     async fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
         let mut gps_rx_idle = cx.shared.gps_rx_idle;
-
 
         let mut utc_hour = cx.shared.utc_hour;
         let mut utc_min = cx.shared.utc_min;
@@ -507,6 +499,7 @@ mod app {
 
         let mut packet_cnt = cx.local.packet_cnt;
 
+        let mut vbat = cx.shared.vbat;
 
         // GNSS-------------------------------------------------------------------------------------
         let mut tx = cx.shared.gps_tx;
@@ -651,8 +644,14 @@ mod app {
                     height[1] = (position_raw[2] >> 8 & 0xFF) as u8;
                 });
 
+                let mut bat_volt: [u8; 1] = [0x00];
+                vbat.lock(|vbat| {
+                    let u: u8 = (*vbat >> 4) as u8;
+                    rprintln!("VBAT: {}", u);
+                    bat_volt = [u];
+                });
 
-                let bat_volt: [u8; 1] = [0x11];
+
                 let flag_byte: [u8; 1] = [0xFF];
                 let crc: [u8; 2] = [0x56, 0x57];
 
@@ -896,10 +895,16 @@ mod app {
 
 
     // ADC measurements ----------------------------------------------------------------------------
-    #[task(priority = 1, shared = [led_g], local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
+    #[task(priority = 1, shared = [led_g, vbat], local = [adc_ch_0, adc_ch_1, adc_1, shutdown, shutdown_next_cycle])]
     async fn read_adc(mut cx: read_adc::Context) {
+        let mut svbat = cx.shared.vbat;
+
         loop {
             let vbat: u16 = cx.local.adc_1.read(cx.local.adc_ch_0).unwrap();
+
+            svbat.lock(|svbat| {
+                *svbat = vbat;
+            });
 
             //Too large for mem
             //let mut vbat_v: f64 = (vbat as f64) * 0.00143 + 0.08;
