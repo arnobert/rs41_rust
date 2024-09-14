@@ -486,7 +486,7 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr], shared = [position, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec])]
+    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec])]
     async fn tx(cx: tx::Context) {
         let radio = cx.local.radio_spi;
         let mut gps_rx_idle = cx.shared.gps_rx_idle;
@@ -502,6 +502,7 @@ mod app {
 
         // Getting position data
         let mut position = cx.shared.position;
+        let mut position_raw = cx.shared.position_raw;
 
 
         // GNSS-------------------------------------------------------------------------------------
@@ -610,8 +611,8 @@ mod app {
 
 
             // GFSK
-            //#[cfg(not(any(feature = "hell")))]
-            //{
+            #[cfg(not(any(feature = "hell")))]
+            {
                 // --------------------------------
                 // HORUS V2 16 Byte Format:
                 // ---------------------------------------------------
@@ -630,9 +631,25 @@ mod app {
                 let payload_id: [u8; 1] = [0x42];
                 let sequence_no: [u8; 1] = [0x23];
                 let secs_day_2: [u8; 2] = [0x00, 0x01];
-                let lat: [u8; 3] = [0x03, 0x04, 0x05];
-                let long: [u8; 3] = [0x06, 0x07, 0x08];
-                let height: [u8; 2] = [0x09, 0x0A];
+
+                let mut lat: [u8; 3] = [0x03, 0x04, 0x05];
+                let mut long: [u8; 3] = [0x06, 0x07, 0x08];
+                let mut height: [u8; 2] = [0x09, 0x0A];
+
+                position_raw.lock(|position_raw| {
+                    lat[0] = (position_raw[0] >> 24 & 0xFF) as u8;
+                    lat[1] = (position_raw[0] >> 16 & 0xFF) as u8;
+                    lat[2] = (position_raw[0] >> 8 & 0xFF) as u8;
+
+                    long[0] = (position_raw[1] >> 24 & 0xFF) as u8;
+                    long[1] = (position_raw[1] >> 16 & 0xFF) as u8;
+                    long[2] = (position_raw[1] >> 8 & 0xFF) as u8;
+
+                    height[0] = (position_raw[2] >> 16 & 0xFF) as u8;
+                    height[1] = (position_raw[2] >> 8 & 0xFF) as u8;
+                });
+
+
                 let bat_volt: [u8; 1] = [0x11];
                 let flag_byte: [u8; 1] = [0xFF];
                 let crc: [u8; 2] = [0x56, 0x57];
@@ -657,7 +674,7 @@ mod app {
                 if !radio.is_tx_on() {
                     radio.tx_on();
                 }
-            //}
+            }
             Systick::delay(TX_PERIOD.secs()).await;
         }
 
@@ -779,7 +796,7 @@ mod app {
                                     position_raw[1] = pack.lon_degrees_raw();
                                     position_raw[2] = pack.height_msl_raw();
 
-                                    rprintln!("LAT: {}", pack.lat_degrees_raw());
+                                    rprintln!("LAT: {}", pack.lat_degrees_raw() & (0xFFFFFF00u32 as i32));
                                     rprintln!("LONG: {}", pack.lon_degrees_raw());
                                     rprintln!("HEIGHT: {}", pack.height_msl_raw());
 
