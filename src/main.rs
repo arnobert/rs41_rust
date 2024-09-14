@@ -766,16 +766,24 @@ mod app {
                     Some(Ok(packet)) => {
                         match packet {
                             PacketRef::NavPosLlh(pack) => {
+
+                                #[cfg(feature = "hell")]
                                 position.lock(|position| {
                                     position[0] = pack.lat_degrees();
                                     position[1] = pack.lon_degrees();
                                     position[2] = pack.height_msl();
                                 });
 
+                                #[cfg(not(any(feature = "hell")))]
                                 position_raw.lock(|position_raw| {
                                     position_raw[0] = pack.lat_degrees_raw();
                                     position_raw[1] = pack.lon_degrees_raw();
                                     position_raw[2] = pack.height_msl_raw();
+
+                                    rprintln!("LAT: {}", pack.lat_degrees_raw());
+                                    rprintln!("LONG: {}", pack.lon_degrees_raw());
+                                    rprintln!("HEIGHT: {}", pack.height_msl_raw());
+
                                 });
                             }
 
@@ -783,17 +791,17 @@ mod app {
 
                                 utc_hour.lock(|utc_hour| {
                                     *utc_hour = pack.hour();
-                                    //rprintln!("HOUR: {} ", utc_hour);
+                                    rprintln!("HOUR: {} ", utc_hour);
                                 });
 
                                 utc_min.lock(|utc_min| {
                                     *utc_min = pack.min();
-                                    //rprintln!("MIN: {} ", utc_min);
+                                    rprintln!("MIN: {} ", utc_min);
                                 });
 
                                 utc_sec.lock(|utc_sec| {
                                     *utc_sec = pack.sec();
-                                    //rprintln!("SEC: {} ", utc_sec);
+                                    rprintln!("SEC: {} ", utc_sec);
                                 });
 
 
