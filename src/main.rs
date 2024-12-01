@@ -364,7 +364,7 @@ mod app {
             radio.set_trxdrtscale(true);
             radio.set_data_rate(HELL_DATA_RATE);
             // CRC
-            radio.set_crc(false);
+            radio.set_crc_en(false);
         }
 
 
@@ -571,6 +571,10 @@ mod app {
 
                 tx_hell(COORD_LONG, radio);
                 tx_hell(&f_long, radio);
+
+                let mut hour: u8 = 0;
+                let mut min: u8 = 0;
+                let mut sec: u8 = 0;
 
                 utc_hour.lock(|utc_hour| {
                     hour = *utc_hour;
