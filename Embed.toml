@@ -35,6 +35,7 @@ connect_under_reset = true
 # Whether or not an RTTUI should be opened after flashing.
 # This is exclusive and cannot be used with GDB at the moment.
 enabled = true
+#enabled = false
 # The duration in ms for which the logger should retry to attach to RTT.
 timeout = 3000
 # Whether timestamps in the RTTUI are enabled
@@ -43,7 +44,7 @@ log_enabled = false
 # Where to save rtt history buffer relative to manifest path.
 log_path = "./logs"
 
-#[default.gdb]
+[default.gdb]
 # Whether or not a GDB server should be opened after flashing.
 # This is exclusive and cannot be used with RTT at the moment.
 #enabled = true
