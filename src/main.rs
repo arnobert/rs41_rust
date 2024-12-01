@@ -693,7 +693,7 @@ mod app {
 
 
     // Receiving data from ublox isr ---------------------------------------------------------------
-    #[task(priority = 2, binds = USART1, shared = [rx_buf, gps_rx_idle], local = [gps_rx, rxd_t1, st_det, payload_len, msg_cnt])]
+    #[task(priority = 3, binds = USART1, shared = [rx_buf, gps_rx_idle], local = [gps_rx, rxd_t1, st_det, payload_len, msg_cnt])]
     fn isr_gps(mut cx: isr_gps::Context) {
         //let rx = cx.shared.gps_rx;
         let rx = cx.local.gps_rx;
