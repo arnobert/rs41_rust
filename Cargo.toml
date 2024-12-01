@@ -25,7 +25,9 @@ version = "0.10.0"
 
 [profile.dev]
 opt-level = "s"
+
 [profile.release]
+opt-level = "z"
 
 
 [dependencies.lexical-core]
