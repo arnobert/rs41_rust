@@ -81,6 +81,9 @@ const COORD_LEN: &[u8; 4] = b"LEN ";
 #[cfg(feature = "hell")]
 const COORD_LONG: &[u8; 5] = b"LONG ";
 
+#[cfg(feature = "hell")]
+const STR_UTC: &[u8; 4] = b"UTC ";
+
 // GFSK mode parameters.
 // 1200 Baud => 0xB6D
 //const GFSK_DATA_RATE: u16 = 0x1D4D;
@@ -602,6 +605,7 @@ mod app {
                 let (f_sec, _) = p_sec.split_at_mut(2);
 
 
+                tx_hell(STR_UTC, radio);
                 tx_hell(&f_hour, radio);
                 tx_hell(&f_min, radio);
                 tx_hell(&f_sec, radio);
