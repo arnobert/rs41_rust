@@ -21,21 +21,33 @@ Please read his documentation: https://github.com/bazjo/radiosonde_hardware/tree
 
 ### What is working:
 ☑️ Flashing the sonde
+
 ☑️ RTIC running
+
 ☑️ LEDs blinking
+
 ☑️ Power button (reading ADC)
+
 ☑️ Radio configuration:
   - frequency
   - tx power
   - modulation
   - GPIOs (heater)
+    
 ☑️ Generating ubx messages
+
 ☑️ Sending ubx messages to u-blox GPS receiver
+
 ☑️ Parsing ubx messages from u-blox
+
 ☑️ Transmitting data via GFSK
+
 ☑️ Hellschreiber mode
+
 ☑️ Transmitting Callsign
+
 ☑️ Transmitting coordinates (height, long, len)
+
 ☑️ Transmitting UTC
 
 ## Unlocking the flash
