@@ -109,6 +109,7 @@ mod app {
     #[shared]
     struct Shared {
         led_g: PB7<Output<PushPull>>,
+        nav_status: bool,
         position: [f64; 3],
         position_raw: [i32; 3],
         utc_hour: u8,
@@ -420,6 +421,7 @@ mod app {
             Shared {
                 position: [0.0; 3],
                 position_raw: [0; 3],
+                nav_status: false,
                 utc_hour: 0,
                 utc_min: 0,
                 utc_sec: 0,
@@ -473,10 +475,20 @@ mod app {
         }
     }
 
-    #[task(priority = 1, local = [led_r])]
-    async fn blink_led(cx: blink_led::Context) {
+    #[task(priority = 3, local = [led_r], shared = [nav_status])]
+    async fn blink_led(mut cx: blink_led::Context) {
+        let mut nav_status_valid = false;
         loop {
-            cx.local.led_r.toggle();
+            cx.shared.nav_status.lock(|nav_status| {
+               nav_status_valid = *nav_status;
+            });
+
+            if !nav_status_valid {
+                cx.local.led_r.toggle();
+            }
+            else {
+                cx.local.led_r.set_high();
+            }
             Systick::delay(1_000.millis()).await;
         }
     }
@@ -537,6 +549,7 @@ mod app {
 
         let packet_pos = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
         let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
+        let packet_nav_status = UbxPacketRequest::request_for::<NavStatus>().into_packet_bytes();
 
         let mut position_len = [b'0'; BUFFER_SIZE];
         let mut position_long = [b'0'; BUFFER_SIZE];
@@ -548,6 +561,8 @@ mod app {
                 let _ = tx.bwrite_all(&packet_pos);
                 let _ = tx.flush();
                 let _ = tx.bwrite_all(&packet_utc);
+                let _ = tx.flush();
+                let _ = tx.bwrite_all(&packet_nav_status);
                 let _ = tx.flush();
             });
 
@@ -769,11 +784,12 @@ mod app {
         }
     }
 
-    #[task(priority = 3, shared = [position, position_raw, rx_buf, utc_hour, utc_min, utc_sec])]
-    async fn parse_gps_data(cx: parse_gps_data::Context) {
+    #[task(priority = 3, shared = [position, position_raw, nav_status, rx_buf, utc_hour, utc_min, utc_sec])]
+    async fn parse_gps_data(mut cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
         let mut position_raw = cx.shared.position_raw;
+        let mut nav_status = cx.shared.nav_status;
         let mut utc_hour = cx.shared.utc_hour;
         let mut utc_min = cx.shared.utc_min;
         let mut utc_sec = cx.shared.utc_sec;
@@ -830,6 +846,23 @@ mod app {
                                     //rprintln!("SEC: {} ", utc_sec);
                                 });
                             }
+
+                            PacketRef::NavStatus(pack) => {
+                                let flgs = pack.flags().bits();
+
+                                if (flgs & 0x01) > 0 {
+                                    nav_status.lock(|nav_status| {
+                                        *nav_status = true;
+                                    });
+                                }
+                                else {
+                                    nav_status.lock(|nav_status| {
+                                        *nav_status = false;
+                                    });
+                                }
+                            }
+
+
                             _ => {}
                         };
                     }
