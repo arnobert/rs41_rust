@@ -19,31 +19,24 @@ I have additionally mounted a SMA plug to connect to a SDR (LimeSDR) or analyzer
 bazjo did an amazing job in reverse-engineering the RS41's PCB.
 Please read his documentation: https://github.com/bazjo/radiosonde_hardware/tree/master/Vaisala_RS41
 
-## Goals, requirements
-For a planned HAB launch the sonde has following requirements:
-- Transmit **location** (coordinates and altitude)
-- **Modulation**: GFSK and Hellschreiber mode
-- Reading environmental (temperature, pressure) sensor optional
-- Additional UART port at external connector
-
-### Already working:
-- Flashing the sonde
-- RTIC runs
-- LEDs blinking
-- Power button (reading ADC)
-- Radio configuration:
+### What is working:
+☑️ Flashing the sonde
+☑️ RTIC running
+☑️ LEDs blinking
+☑️ Power button (reading ADC)
+☑️ Radio configuration:
   - frequency
   - tx power
   - modulation
-  - ...
-- Transmitting data via GFSK
-- Hellschreiber mode (needs fine tuning)
-- Generating ubx messages
-- Sending ubx messages to u-blox GPS receiver
-- Parsing ubx messages from u-blox
-
-### Next steps:
-- Improving GFSK receiver (GNU Radio)
+  - GPIOs (heater)
+☑️ Generating ubx messages
+☑️ Sending ubx messages to u-blox GPS receiver
+☑️ Parsing ubx messages from u-blox
+☑️ Transmitting data via GFSK
+☑️ Hellschreiber mode
+☑️ Transmitting Callsign
+☑️ Transmitting coordinates (height, long, len)
+☑️ Transmitting UTC
 
 ## Unlocking the flash
 
