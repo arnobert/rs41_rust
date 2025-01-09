@@ -3,6 +3,19 @@ Hellschreiber implementation for RS41.
 We use Feld Hell with 7x14 pixels.
  */
 
+
+// Hell mode parameters
+// Set data rate to:
+// 0x254 for Feld Hell
+// TBD: Slow Hell, Hell x5 ...
+
+pub const HELL_DATA_RATE: u16 = 0x252;
+pub const HELL_DELAY: u32 = 150000;
+pub const COORD_HEIGHT: &[u8; 7] = b"HEIGHT ";
+pub const COORD_LEN: &[u8; 4] = b"LEN ";
+pub const COORD_LONG: &[u8; 5] = b"LONG ";
+pub const STR_UTC: &[u8; 4] = b"UTC ";
+
 pub fn get_char(x : u8) -> u128 {
     let c = match x {
         //     XX77777777777777666666666666665555555555555544444444444444333333333333332222222222222211111111111111

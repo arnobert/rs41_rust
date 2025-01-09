@@ -61,28 +61,6 @@ const F_C_LOWER: u8 = (FCU & 0x00FF) as u8;
 //const F_C_UPPER: u8 = ((CAR_FREQ_REG & 0xFF00) >> 8) as u8;
 //const F_C_LOWER: u8 = (CAR_FREQ_REG & 0x00FF) as u8;
 
-// Hell mode parameters
-// Set data rate to:
-// 0x254 for Feld Hell
-// TBD: Slow Hell, Hell x5 ...
-
-#[cfg(feature = "hell")]
-const HELL_DATA_RATE: u16 = 0x252;
-
-#[cfg(feature = "hell")]
-const HELL_DELAY: u32 = 150000;
-
-#[cfg(feature = "hell")]
-const COORD_HEIGHT: &[u8; 7] = b"HEIGHT ";
-
-#[cfg(feature = "hell")]
-const COORD_LEN: &[u8; 4] = b"LEN ";
-
-#[cfg(feature = "hell")]
-const COORD_LONG: &[u8; 5] = b"LONG ";
-
-#[cfg(feature = "hell")]
-const STR_UTC: &[u8; 4] = b"UTC ";
 
 // GFSK mode parameters.
 // 1200 Baud => 0xB6D
@@ -366,12 +344,11 @@ mod app {
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             radio.set_trxdrtscale(true);
-            radio.set_data_rate(HELL_DATA_RATE);
+            radio.set_data_rate(hell::HELL_DATA_RATE);
             // CRC
             radio.set_crc_en(false);
         }
-
-
+        
         // Config for GFSK mode ----------------------------------------------------------------
         #[cfg(not(any(feature = "hell")))]
         {
@@ -540,7 +517,7 @@ mod app {
                     }
                 }
 
-                for _ in 0..HELL_DELAY {
+                for _ in 0..hell::HELL_DELAY {
                     cortex_m::asm::nop();
                 }
             }
@@ -581,13 +558,13 @@ mod app {
             {
                 tx_hell(CALLSIGN, radio);
 
-                tx_hell(COORD_HEIGHT, radio);
+                tx_hell(hell::COORD_HEIGHT, radio);
                 tx_hell(f_height, radio);
 
-                tx_hell(COORD_LEN, radio);
+                tx_hell(hell::COORD_LEN, radio);
                 tx_hell(f_len, radio);
 
-                tx_hell(COORD_LONG, radio);
+                tx_hell(hell::COORD_LONG, radio);
                 tx_hell(&f_long, radio);
 
                 let mut hour: u8 = 0;
@@ -620,7 +597,7 @@ mod app {
                 let (f_sec, _) = p_sec.split_at_mut(2);
 
 
-                tx_hell(STR_UTC, radio);
+                tx_hell(hell::STR_UTC, radio);
                 tx_hell(&f_hour, radio);
                 tx_hell(&f_min, radio);
                 tx_hell(&f_sec, radio);
