@@ -64,6 +64,14 @@ telnet 127.0.0.1 4444
 > flash protect 0 0 15 off
 ```
 
+### For some the command above might not work. Then run
+```
+telnet 127.0.0.1 4444
+
+> reset halt
+> stm32f1x unlock 0
+```
+
 ## Building
 
 ```
