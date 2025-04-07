@@ -32,7 +32,7 @@ use lexical_core::BUFFER_SIZE;
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const CALLSIGN: &[u8; 11] = b"DQ50RUB WX ";
+const CALLSIGN: &[u8; 10] = b"DL2SSB WX ";
 
 
 // Carrier freq in MHz
