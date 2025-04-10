@@ -36,11 +36,11 @@ const CALLSIGN: &[u8; 10] = b"DL2SSB WX ";
 
 
 // Carrier freq in MHz
-const CAR_FREQ: f32 = 432.2;
+const CAR_FREQ: f32 = 433.7;
 
 
 // TX PERIOD [s]
-const TX_PERIOD: u32 = 1;
+const TX_PERIOD: u32 = 20;
 
 // TX power
 const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
@@ -177,7 +177,7 @@ mod app {
 
         let mut ledg = gpiob
             .pb7
-            .into_push_pull_output_with_state(&mut gpiob.crl, PinState::Low);
+            .into_push_pull_output_with_state(&mut gpiob.crl, PinState::High);
 
         ledr.toggle();
 
@@ -334,7 +334,7 @@ mod app {
         radio.init_gpio_1();
         radio.set_gpio_1(false);
 
-        radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
+        radio.set_tx_pwr(si4032_driver::ETxPower::P17dBm);
 
         // Config for HELL mode ----------------------------------------------------------------
         #[cfg(feature = "hell")]
@@ -525,7 +525,7 @@ mod app {
 
 
         let packet_pos = UbxPacketRequest::request_for::<NavPosLlh>().into_packet_bytes();
-        let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
+        //let packet_utc = UbxPacketRequest::request_for::<NavTimeUTC>().into_packet_bytes();
         let packet_nav_status = UbxPacketRequest::request_for::<NavStatus>().into_packet_bytes();
 
         let mut position_len = [b'0'; BUFFER_SIZE];
@@ -537,8 +537,8 @@ mod app {
             tx.lock(|tx| {
                 let _ = tx.bwrite_all(&packet_pos);
                 let _ = tx.flush();
-                let _ = tx.bwrite_all(&packet_utc);
-                let _ = tx.flush();
+                //let _ = tx.bwrite_all(&packet_utc);
+                //let _ = tx.flush();
                 let _ = tx.bwrite_all(&packet_nav_status);
                 let _ = tx.flush();
             });
@@ -567,6 +567,7 @@ mod app {
                 tx_hell(hell::COORD_LONG, radio);
                 tx_hell(&f_long, radio);
 
+                /*
                 let mut hour: u8 = 0;
                 let mut min: u8 = 0;
                 let mut sec: u8 = 0;
@@ -601,6 +602,8 @@ mod app {
                 tx_hell(&f_hour, radio);
                 tx_hell(&f_min, radio);
                 tx_hell(&f_sec, radio);
+
+                 */
 
             }
 
@@ -761,7 +764,7 @@ mod app {
         }
     }
 
-    #[task(priority = 3, shared = [position, position_raw, nav_status, rx_buf, utc_hour, utc_min, utc_sec])]
+    #[task(priority = 3, shared = [position, position_raw, nav_status, rx_buf, utc_hour, utc_min, utc_sec, led_g])]
     async fn parse_gps_data(mut cx: parse_gps_data::Context) {
         let mut rx_buf = cx.shared.rx_buf;
         let mut position = cx.shared.position;
@@ -770,6 +773,7 @@ mod app {
         let mut utc_hour = cx.shared.utc_hour;
         let mut utc_min = cx.shared.utc_min;
         let mut utc_sec = cx.shared.utc_sec;
+        let mut ledg = cx.shared.led_g;
 
         // Local buffer
         let mut pbuf: Vec<u8, RX_BUF_SIZE> = Vec::new();
@@ -783,6 +787,9 @@ mod app {
             loop {
                 match rxdt.next() {
                     Some(Ok(packet)) => {
+
+                        ledg.lock(|ledg| {ledg.toggle()});
+
                         match packet {
                             PacketRef::NavPosLlh(pack) => {
 
