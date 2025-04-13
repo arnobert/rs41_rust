@@ -294,7 +294,9 @@ mod app {
         let _ = gps_tx.bwrite_all(&packet);
         let _ = gps_tx.flush();
 
-        // Set Dynamic model: Airborne <2g
+        cortex_m::asm::delay(10_000_000);
+
+        // Set Dynamic model: Airborne <1g
         let model_packet = CfgNav5Builder {
             mask: CfgNav5Params::DYN,
             dyn_model: CfgNav5DynModel::AirborneWithLess1gAcceleration,
@@ -319,6 +321,17 @@ mod app {
         }.into_packet_bytes();
 
         let _ = gps_tx.bwrite_all(&model_packet);
+        let _ = gps_tx.flush();
+
+        cortex_m::asm::delay(10_000_000);
+
+        let req_cfg = UbxPacketRequest::request_for::<CfgNav5>().into_packet_bytes();
+
+        let _ = gps_tx.bwrite_all(&req_cfg);
+        let _ = gps_tx.flush();
+
+        // --- GPS config done ---
+
         gps_rx.listen();
 
 
@@ -844,6 +857,14 @@ mod app {
                                         *nav_status = false;
                                     });
                                 }
+                            }
+
+                            PacketRef::CfgNav5(pack) => {
+                                let model = pack.dyn_model();
+                            }
+
+                            PacketRef::AckAck(pack) => {
+                                let x = pack.as_bytes();
                             }
 
 
