@@ -10,7 +10,7 @@ rtic-monotonics = { version = "1.5.0", features = ["cortex-m-systick"]}
 rtt-target = "0.5.0"
 embedded-hal = "0.2.7"
 panic-halt = "^0.2.0"
-ublox = { version = "=0.4.5", default-features = false }
+ublox = { version = "=0.5.0", default-features = false, features = ["ubx_proto23"] }
 heapless = "0.7.16"
 systick-monotonic = "1.0.1"
 si4032_driver = {version = "0.1.0", path = "../si4032_driver-rs"}
