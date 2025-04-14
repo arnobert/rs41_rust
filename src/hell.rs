@@ -15,6 +15,7 @@ pub const COORD_HEIGHT: &[u8; 7] = b"HEIGHT ";
 pub const COORD_LEN: &[u8; 4] = b"LEN ";
 pub const COORD_LONG: &[u8; 5] = b"LONG ";
 pub const STR_UTC: &[u8; 4] = b"UTC ";
+pub const ERR_GPS: &[u8; 7] = b"NO GPS ";
 
 pub fn get_char(x : u8) -> u128 {
     let c = match x {

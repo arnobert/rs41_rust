@@ -294,6 +294,7 @@ mod app {
         let _ = gps_tx.bwrite_all(&packet);
         let _ = gps_tx.flush();
 
+        //gps_rx.listen();
         cortex_m::asm::delay(10_000_000);
 
         // Set Dynamic model: Airborne <1g
@@ -488,8 +489,8 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr, packet_cnt], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec, vbat])]
-    async fn tx(cx: tx::Context) {
+    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr, packet_cnt], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec, vbat, nav_status])]
+    async fn tx(mut cx: tx::Context) {
         let radio = cx.local.radio_spi;
         let mut gps_rx_idle = cx.shared.gps_rx_idle;
 
@@ -505,6 +506,7 @@ mod app {
 
         let mut vbat = cx.shared.vbat;
 
+        let mut nav_status_valid = false;
         // GNSS-------------------------------------------------------------------------------------
         let mut tx = cx.shared.gps_tx;
 
@@ -566,19 +568,28 @@ mod app {
             let (f_long, _) = position_long.split_at_mut(8);
             let (f_height, _) = position_height.split_at_mut(5);
 
+            cx.shared.nav_status.lock(|nav_status| {
+                nav_status_valid = *nav_status;
+            });
+
             // OOK / HELL
             #[cfg(feature = "hell")]
             {
                 tx_hell(CALLSIGN, radio);
 
-                tx_hell(hell::COORD_HEIGHT, radio);
-                tx_hell(f_height, radio);
+                if nav_status_valid {
+                    tx_hell(hell::COORD_HEIGHT, radio);
+                    tx_hell(f_height, radio);
 
-                tx_hell(hell::COORD_LEN, radio);
-                tx_hell(f_len, radio);
+                    tx_hell(hell::COORD_LEN, radio);
+                    tx_hell(f_len, radio);
 
-                tx_hell(hell::COORD_LONG, radio);
-                tx_hell(&f_long, radio);
+                    tx_hell(hell::COORD_LONG, radio);
+                    tx_hell(&f_long, radio);
+                }
+                else {
+                    tx_hell(hell::ERR_GPS, radio);
+                }
 
                 /*
                 let mut hour: u8 = 0;
