@@ -34,8 +34,8 @@ connect_under_reset = true
 [default.rtt]
 # Whether or not an RTTUI should be opened after flashing.
 # This is exclusive and cannot be used with GDB at the moment.
-enabled = true
-#enabled = false
+#enabled = true
+enabled = false
 # The duration in ms for which the logger should retry to attach to RTT.
 timeout = 3000
 # Whether timestamps in the RTTUI are enabled
@@ -47,7 +47,7 @@ log_path = "./logs"
 [default.gdb]
 # Whether or not a GDB server should be opened after flashing.
 # This is exclusive and cannot be used with RTT at the moment.
-#enabled = true
+enabled = true
 #enabled = false
 # The connection string in host:port format wher the GDB server will open a socket.
 # gdb_connection_string
