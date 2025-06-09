@@ -40,7 +40,7 @@ const CAR_FREQ: f32 = 433.7;
 
 
 // TX PERIOD [s]
-const TX_PERIOD: u32 = 20;
+const TX_PERIOD: u32 = 5;
 
 // TX power
 const TX_POWER: si4032_driver::ETxPower = si4032_driver::ETxPower::P5dBm;
@@ -348,7 +348,7 @@ mod app {
         radio.init_gpio_1();
         radio.set_gpio_1(false);
 
-        radio.set_tx_pwr(si4032_driver::ETxPower::P17dBm);
+        radio.set_tx_pwr(si4032_driver::ETxPower::P1dBm);
 
         // Config for HELL mode ----------------------------------------------------------------
         #[cfg(feature = "hell")]
@@ -393,7 +393,7 @@ mod app {
             radio.set_tx_header_len(0);
 
             // Packet Length
-            radio.set_packet_len(14);
+            radio.set_packet_len(18);
             radio.set_tx_fixplen(false);
 
             // CRC
@@ -643,9 +643,9 @@ mod app {
                 //    0     |       1      |  uint8    | Payload ID -> 0x42
                 //    1     |       1      |  uint8    | Sequence No
                 //    2     |       2      |  uint16   | Seconds of UTC
-                //    4     |       3      |  Q9.15    | Latitude
-                //    7     |       3      |  Q9.15    | Longitude
-                //    10    |       2      |  uint16   | Height (m)
+                //    4     |       4      |  i32      | Latitude
+                //    7     |       4      |  i32      | Longitude
+                //    10    |       4      |  i32      | Height (m)
                 //    12    |       1      |  uint8    | Battery Voltage
                 //    13    |       1      |  uint8    | Flags Byte
                 //    14    |       2      |  uint16   | CRC
@@ -655,21 +655,26 @@ mod app {
                     sec = *utc_sec;
                 });
 
-                let mut lat: [u8; 3] = [0x0; 3];
-                let mut long: [u8; 3] = [0x0; 3];
-                let mut height: [u8; 2] = [0x0; 2];
+                let mut lat: [u8; 4] = [0x0; 4];
+                let mut long: [u8; 4] = [0x0; 4];
+                let mut height: [u8; 4] = [0x0; 4];
 
                 position_raw.lock(|position_raw| {
+
                     lat[0] = (position_raw[0] >> 24 & 0xFF) as u8;
                     lat[1] = (position_raw[0] >> 16 & 0xFF) as u8;
-                    lat[2] = (position_raw[0] >> 8 & 0xFF) as u8;
+                    lat[2] = (position_raw[0] >>  8 & 0xFF) as u8;
+                    lat[3] = (position_raw[0]       & 0xFF) as u8;
 
                     long[0] = (position_raw[1] >> 24 & 0xFF) as u8;
                     long[1] = (position_raw[1] >> 16 & 0xFF) as u8;
-                    long[2] = (position_raw[1] >> 8 & 0xFF) as u8;
+                    long[2] = (position_raw[1] >>  8 & 0xFF) as u8;
+                    long[3] = (position_raw[1]       & 0xFF) as u8;
 
-                    height[0] = (position_raw[2] >> 16 & 0xFF) as u8;
-                    height[1] = (position_raw[2] >> 8 & 0xFF) as u8;
+                    height[0] = (position_raw[2] >> 24 & 0xFF) as u8;
+                    height[1] = (position_raw[2] >> 16 & 0xFF) as u8;
+                    height[2] = (position_raw[2] >>  8 & 0xFF) as u8;
+                    height[3] = (position_raw[2]       & 0xFF) as u8;
                 });
 
                 let mut bat_volt: [u8; 1] = [0x00];
@@ -678,7 +683,6 @@ mod app {
                     rprintln!("VBAT: {}", u);
                     bat_volt = [u];
                 });
-
 
                 let flag_byte: [u8; 1] = [0xAF];
 
@@ -690,11 +694,15 @@ mod app {
                 radio.write_fifo(&[lat[0]]);
                 radio.write_fifo(&[lat[1]]);
                 radio.write_fifo(&[lat[2]]);
+                radio.write_fifo(&[lat[3]]);
                 radio.write_fifo(&[long[0]]);
                 radio.write_fifo(&[long[1]]);
                 radio.write_fifo(&[long[2]]);
+                radio.write_fifo(&[long[3]]);
                 radio.write_fifo(&[height[0]]);
                 radio.write_fifo(&[height[1]]);
+                radio.write_fifo(&[height[2]]);
+                radio.write_fifo(&[height[3]]);
                 radio.write_fifo(&bat_volt);
                 radio.write_fifo(&flag_byte);
 
@@ -830,9 +838,6 @@ mod app {
                                     position_raw[1] = pack.lon_degrees_raw();
                                     position_raw[2] = pack.height_msl_raw();
 
-                                    rprintln!("LAT: {}", pack.lat_degrees_raw());
-                                    rprintln!("LONG: {}", pack.lon_degrees_raw());
-                                    rprintln!("HEIGHT: {}", pack.height_msl_raw());
 
                                 });
                             }
