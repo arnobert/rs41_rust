@@ -369,7 +369,7 @@ mod app {
             // Reference Heat
             radio.set_gpio_1(false);
 
-            radio.set_man_en(true);
+            radio.set_man_en(false);
             radio.set_modulation_type(si4032_driver::ModType::FSK);
             radio.set_freq_deviation(0x05);
             radio.set_trxdrtscale(true);
@@ -379,7 +379,7 @@ mod app {
             radio.set_modulation_source(si4032_driver::ModDataSrc::Fifo);
 
             // Preamble
-            radio.set_tx_prealen(0x0F);
+            radio.set_tx_prealen(0x2F);
 
             // Sync Word
             radio.set_sync_wrd(0x1798 << 16);
