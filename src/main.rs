@@ -393,7 +393,7 @@ mod app {
             radio.set_tx_header_len(0);
 
             // Packet Length
-            radio.set_packet_len(18);
+            radio.set_packet_len(16);
             radio.set_tx_fixplen(false);
 
             // CRC
