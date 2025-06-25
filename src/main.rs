@@ -125,7 +125,8 @@ mod app {
         payload_len: u16,
         msg_cnt: u16,
         gpio_temp: stm32f1xx_hal::gpio::Pin<'A', 1>,
-        packet_cnt: u8
+        packet_cnt: u8,
+        crc: stm32f1xx_hal::crc::Crc
     }
 
 
@@ -241,6 +242,10 @@ mod app {
 
         // SHUTDOWN pin ----------------------------------------------------------------------------
         let shtdwn = gpioa.pa12.into_push_pull_output_with_state(&mut gpioa.crh, PinState::Low);
+
+        // CRC -------------------------------------------------------------------------------------
+
+        let mut crc = cx.device.CRC.new();
 
         // Metrology interface ---------------------------------------------------------------------
 
@@ -369,6 +374,8 @@ mod app {
             // Reference Heat
             radio.set_gpio_1(false);
 
+            radio.clear_fifo();
+
             radio.set_man_en(false);
             radio.set_modulation_type(si4032_driver::ModType::FSK);
             radio.set_freq_deviation(0x05);
@@ -393,14 +400,12 @@ mod app {
             radio.set_tx_header_len(0);
 
             // Packet Length
-            radio.set_packet_len(16);
+            radio.set_packet_len(22);
             radio.set_tx_fixplen(false);
 
-            // CRC
+            // CRC in Si4032 disabled, calculated by uC
             radio.set_enpac(true);
-            radio.set_crc_en(true);
-            //radio.set_crc_d_only(true);
-            radio.set_crc_poly(si4032_driver::CrcPoly::Biacheva);
+            radio.set_crc_en(false);
 
 
         }
@@ -445,6 +450,7 @@ mod app {
                 msg_cnt,
                 gpio_temp: meas_in,
                 packet_cnt: 0,
+                crc,
             },
         )
     }
@@ -489,7 +495,7 @@ mod app {
     // This is the main task. We receive our GPS location, calculate coordinates,
     // concat the characters and write to radio FIFO.
     // ---------------------------------------------------------------------------------------------
-    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr, packet_cnt], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec, vbat, nav_status])]
+    #[task(priority = 2, local = [radio_spi, freq_upper, freq_lower, txpwr, packet_cnt, crc], shared = [position, position_raw, gps_tx, gps_rx_idle, utc_hour, utc_min, utc_sec, vbat, nav_status])]
     async fn tx(mut cx: tx::Context) {
         let radio = cx.local.radio_spi;
         let mut gps_rx_idle = cx.shared.gps_rx_idle;
@@ -507,6 +513,10 @@ mod app {
         let mut vbat = cx.shared.vbat;
 
         let mut nav_status_valid = false;
+
+        let mut crc = cx.local.crc;
+
+
         // GNSS-------------------------------------------------------------------------------------
         let mut tx = cx.shared.gps_tx;
 
@@ -655,6 +665,9 @@ mod app {
                     sec = *utc_sec;
                 });
 
+                crc.reset();
+                crc.write(*packet_cnt as u32);
+
                 let mut lat: [u8; 4] = [0x0; 4];
                 let mut long: [u8; 4] = [0x0; 4];
                 let mut height: [u8; 4] = [0x0; 4];
@@ -680,13 +693,15 @@ mod app {
                 let mut bat_volt: [u8; 1] = [0x00];
                 vbat.lock(|vbat| {
                     let u: u8 = (*vbat >> 4) as u8;
-                    rprintln!("VBAT: {}", u);
+                    //rprintln!("VBAT: {}", u);
                     bat_volt = [u];
                 });
 
-                let flag_byte: [u8; 1] = [0xAF];
+                let flag_byte: [u8; 1] = [0xA1];
 
-                radio.tx_on();
+                let crc_v: [u8; 4] = crc.read().to_be_bytes();
+                rprintln!("CRC: {:x}", crc.read());
+
                 // --- PACKET ASSEMBLY ------------
                 radio.write_fifo(&[0x42]);
                 radio.write_fifo(&[*packet_cnt]);
@@ -705,10 +720,9 @@ mod app {
                 radio.write_fifo(&[height[3]]);
                 radio.write_fifo(&bat_volt);
                 radio.write_fifo(&flag_byte);
+                radio.write_fifo(&[crc_v[3], crc_v[2], crc_v[1], crc_v[0]]);
 
-                //if !radio.is_tx_on() {
-                //    radio.tx_on();
-                //}
+                radio.tx_on();
 
                 *packet_cnt = (*packet_cnt % 255) + 1;
             }
