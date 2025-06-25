@@ -32,7 +32,7 @@ use lexical_core::BUFFER_SIZE;
 // USER CONFIG -------------------------------------------------------------------------------------
 
 // CALLSIGN
-const CALLSIGN: &[u8; 10] = b"DL2SSB WX ";
+const CALLSIGN: &[u8; 8] = b"DL2SSB  ";
 
 
 // Carrier freq in MHz
@@ -400,7 +400,7 @@ mod app {
             radio.set_tx_header_len(0);
 
             // Packet Length
-            radio.set_packet_len(22);
+            radio.set_packet_len(30);
             radio.set_tx_fixplen(false);
 
             // CRC in Si4032 disabled, calculated by uC
@@ -658,7 +658,8 @@ mod app {
                 //    10    |       4      |  i32      | Height (m)
                 //    12    |       1      |  uint8    | Battery Voltage
                 //    13    |       1      |  uint8    | Flags Byte
-                //    14    |       2      |  uint16   | CRC
+                //    14    |       8      |  char     | Callsign
+                //    22    |       2      |  uint16   | CRC
                 // ---------------------------------------------------
                 // --- Flags ---
                 // ---------------------------------------------------
@@ -739,6 +740,7 @@ mod app {
                 radio.write_fifo(&[height[3]]);
                 radio.write_fifo(&bat_volt);
                 radio.write_fifo(&[flag_byte]);
+                radio.write_fifo(CALLSIGN);
                 radio.write_fifo(&[crc_v[3], crc_v[2], crc_v[1], crc_v[0]]);
 
                 radio.tx_on();
