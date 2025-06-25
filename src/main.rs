@@ -665,16 +665,20 @@ mod app {
                 //  BIT | Description
                 // ---------------------------------------------------
                 //   0  | GPS Valid
-                //   0  |  1  | --
-                //   0  |  2  | --
-                //   0  |  3  | --
-                //   0  |  4  | - always 1 -
-                //   0  |  5  | --
-                //   0  |  6  | --
-                //   0  |  7  | --
+                //   1  | --
+                //   2  | --
+                //   3  | --
+                //   4  | - always 1 -
+                //   5  | --
+                //   6  | --
+                //   7  | --
 
+                let mut flag_byte: u8 = 1 << 4;
 
-                let flag_byte: [u8; 1] = [0xA1];
+                if nav_status_valid {
+                    flag_byte = flag_byte | 0x01;
+                };
+
 
                 let mut sec: u8 = 0;
                 utc_sec.lock(|utc_sec| {
@@ -734,7 +738,7 @@ mod app {
                 radio.write_fifo(&[height[2]]);
                 radio.write_fifo(&[height[3]]);
                 radio.write_fifo(&bat_volt);
-                radio.write_fifo(&flag_byte);
+                radio.write_fifo(&[flag_byte]);
                 radio.write_fifo(&[crc_v[3], crc_v[2], crc_v[1], crc_v[0]]);
 
                 radio.tx_on();
