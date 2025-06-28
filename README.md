@@ -56,6 +56,8 @@ The (G)FSK mode also transmits
 * sequence number
 * CRC
 
+You will find the (G)FSK receiver project here: https://codeberg.org/dl2ssb/rs41_rx-rs
+
 ---
 
 ## Unlocking the flash:
